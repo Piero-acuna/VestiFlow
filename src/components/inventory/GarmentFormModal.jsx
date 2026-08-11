@@ -1,0 +1,185 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/inventory/GarmentFormModal.jsx
+// Alta y edición de una prenda: identificación, fotos, precios y la matriz
+// de variantes (talla × color). Mismo layout en 4 secciones que ya usaba el
+// formulario de producto genérico, para que se sienta como el mismo sistema.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useState } from "react";
+import { X, Plus, Edit3, Loader2, Save } from "lucide-react";
+import { addGarment, updateGarment } from "../../services/mock/garmentsStore";
+import { logAndGetErrorMessage } from "../../utils/errors";
+import { calcProfit, calcMarginPercent } from "../../utils/finance";
+import { formatMoney } from "../../utils/currency";
+import { CATEGORIES, getSizesForCategory } from "../../config/clothingConfig";
+import ImageUploader from "./ImageUploader";
+import VariantMatrix from "./VariantMatrix";
+
+const emptyForm = {
+  name: "", brand: "", sku: "", category: CATEGORIES[0].id, description: "",
+  price: "", cost: "", minStock: "2", images: [],
+};
+
+export default function GarmentFormModal({ companyId, userName, garment, currencySymbol, canViewFinance, onClose }) {
+  const isEdit = !!garment;
+  const [form, setForm] = useState(() => isEdit ? {
+    name: garment.name, brand: garment.brand || "", sku: garment.sku, category: garment.category,
+    description: garment.description || "", price: garment.price ?? "", cost: garment.cost ?? "",
+    minStock: garment.variants?.[0]?.minStock ?? 2, images: garment.images || [],
+  } : emptyForm);
+  const [variants, setVariants] = useState(garment?.variants || []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const sizes = getSizesForCategory(form.category);
+  const set = (key) => (value) => setForm(f => ({ ...f, [key]: value }));
+
+  async function handleSave() {
+    if (!form.name || !form.sku || variants.length === 0) {
+      setError(variants.length === 0 ? "Agrega al menos una talla y un color." : "Completa nombre y SKU.");
+      return;
+    }
+    setSaving(true); setError("");
+    const payload = {
+      name: form.name, brand: form.brand, sku: form.sku, category: form.category,
+      description: form.description,
+      price: Number(form.price) || 0,
+      cost: Number(form.cost) || 0,
+      images: form.images,
+      variants: variants.map(v => ({ ...v, minStock: Number(form.minStock) || 0 })),
+    };
+    try {
+      if (isEdit) {
+        await updateGarment(companyId, garment.id, payload);
+      } else {
+        await addGarment(companyId, { ...payload, createdBy: userName });
+      }
+      onClose();
+    } catch (err) {
+      setError(logAndGetErrorMessage(err, "Error al guardar prenda:"));
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-5 border-b border-slate-700 flex-shrink-0">
+          <div>
+            <h3 className="font-bold text-white flex items-center gap-2">
+              {isEdit ? <Edit3 size={16} className="text-amber-400" /> : <Plus size={16} className="text-amber-400" />}
+              {isEdit ? "Editar Prenda" : "Nueva Prenda"}
+            </h3>
+            {isEdit && <p className="text-xs text-slate-500 font-mono mt-0.5">{garment.sku}</p>}
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-5">
+          {/* Identificación */}
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Identificación</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs text-slate-400 mb-1 block">Nombre de la prenda *</label>
+                <input value={form.name} onChange={e => set("name")(e.target.value)} placeholder="Ej: Polo Oversize Algodón"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
+                <select value={form.category} onChange={e => set("category")(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500 transition-colors">
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Marca</label>
+                <input value={form.brand} onChange={e => set("brand")(e.target.value)} placeholder="Ej: Basics Co."
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">SKU base *</label>
+                <p className="text-[10px] text-slate-500 mb-1">El SKU de cada talla/color se arma solo a partir de este</p>
+                <input value={form.sku} onChange={e => set("sku")(e.target.value)} placeholder="Ej: POLO-001"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-slate-400 mb-1 block">Descripción</label>
+                <textarea value={form.description} onChange={e => set("description")(e.target.value)} rows={2}
+                  placeholder="Tela, corte, cuidados…"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors resize-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* Fotos */}
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Fotos</p>
+            <ImageUploader images={form.images} onChange={set("images")} />
+          </div>
+
+          {/* Precios */}
+          {canViewFinance ? (
+            <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 space-y-3">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Precios</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-emerald-400 mb-0.5 block">Precio de venta ({currencySymbol})</label>
+                  <input type="number" min="0" step="0.01" value={form.price} onChange={e => set("price")(e.target.value)} placeholder="0.00"
+                    className="w-full px-3 py-2 bg-slate-900 border border-emerald-500/30 rounded-lg text-sm text-emerald-300 font-mono placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-sky-400 mb-0.5 block">Costo ({currencySymbol})</label>
+                  <input type="number" min="0" step="0.01" value={form.cost} onChange={e => set("cost")(e.target.value)} placeholder="0.00"
+                    className="w-full px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-lg text-sm text-sky-300 font-mono placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors" />
+                </div>
+              </div>
+              {form.price > 0 && form.cost > 0 && (() => {
+                const profit = calcProfit(form.price, form.cost);
+                const margin = calcMarginPercent(form.price, form.cost);
+                return (
+                  <div className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs ${margin >= 0 ? "bg-amber-500/10 border-amber-500/30" : "bg-red-500/10 border-red-500/30"}`}>
+                    <span className="text-slate-400">Ganancia por unidad</span>
+                    <div className="text-right">
+                      <span className={`font-mono font-bold ${margin >= 0 ? "text-amber-400" : "text-red-400"}`}>{formatMoney(profit, currencySymbol)}</span>
+                      <span className={`ml-2 ${margin >= 0 ? "text-amber-400" : "text-red-400"}`}>({margin.toFixed(1)}% margen)</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-semibold text-emerald-400 mb-0.5 block">Precio de venta ({currencySymbol})</label>
+              <input type="number" min="0" step="0.01" value={form.price} onChange={e => set("price")(e.target.value)} placeholder="0.00"
+                className="w-full px-3 py-2 bg-slate-800 border border-emerald-500/30 rounded-lg text-sm text-emerald-300 font-mono focus:outline-none focus:border-emerald-500 transition-colors" />
+            </div>
+          )}
+
+          {/* Variantes */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Variantes</p>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                Stock mínimo (alerta)
+                <input type="number" min="0" value={form.minStock} onChange={e => set("minStock")(e.target.value)}
+                  className="w-14 px-1.5 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500" />
+              </label>
+            </div>
+            <VariantMatrix availableSizes={sizes} baseSku={form.sku || "SKU"} initialVariants={variants} onChange={setVariants} />
+          </div>
+
+          {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 p-5 border-t border-slate-700 flex-shrink-0">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-600 text-slate-400 rounded-xl text-sm hover:border-slate-500 transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+            {saving && <Loader2 size={14} className="animate-spin" />}<Save size={14} />{isEdit ? "Guardar Cambios" : "Guardar Prenda"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
