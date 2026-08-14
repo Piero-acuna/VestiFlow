@@ -11,7 +11,7 @@
 import { useState, useEffect } from "react";
 import {
   subscribeToLocations, subscribeToWarehouseStock, subscribeToWarehouseMovements,
-} from "../services/mock/warehouseStore";
+} from "../services/supabase/warehouseStore";
 
 export function useWarehouseData(companyId) {
   const [locations, setLocations] = useState([]);

@@ -5,9 +5,7 @@
 // variante. Reemplaza la tabla de "productos" genérica de la versión anterior
 // — misma posición en el shell, mismo tono visual, dominio distinto.
 //
-// Fuente de datos: src/services/mock/garmentsStore.js (local, sin backend
-// todavía — ver conversación). Cuando se conecte Supabase, useGarments() y
-// este módulo no cambian; solo cambia lo que hay DENTRO de garmentsStore.js.
+// Fuente de datos: src/services/supabase/garmentsStore.js.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo } from "react";
 import { Search, Plus, Shirt, CheckCircle, AlertTriangle, X } from "lucide-react";

@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { X, Plus, Edit3, Loader2, Save } from "lucide-react";
-import { addGarment, updateGarment } from "../../services/mock/garmentsStore";
+import { addGarment, updateGarment } from "../../services/supabase/garmentsStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { calcProfit, calcMarginPercent } from "../../utils/finance";
 import { formatMoney } from "../../utils/currency";
@@ -115,7 +115,7 @@ export default function GarmentFormModal({ companyId, userName, garment, currenc
           {/* Fotos */}
           <div>
             <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Fotos</p>
-            <ImageUploader images={form.images} onChange={set("images")} />
+            <ImageUploader images={form.images} onChange={set("images")} companyId={companyId} />
           </div>
 
           {/* Precios */}

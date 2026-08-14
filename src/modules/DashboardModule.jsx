@@ -18,9 +18,10 @@ import {
   CheckCircle2, TrendingUp, TrendingDown, Clock, ArrowRight, Wallet,
   Boxes, ShoppingCart, PackageX, Loader2, Trophy, ArrowDownCircle,
 } from "lucide-react";
-import { useCollection } from "../hooks/useCollection";
+import { useSupabaseList } from "../hooks/useSupabaseList";
+import { subscribeToSuppliers, subscribeToSupplierReturns } from "../services/supabase/suppliersStore";
 import { useGarments } from "../hooks/useGarments";
-import { useMockTransactions } from "../hooks/useMockTransactions";
+import { useTransactions } from "../hooks/useTransactions";
 import { useWarehouseData } from "../hooks/useWarehouseData";
 import { useAuth } from "../contexts/AuthContext";
 import { formatMoney } from "../utils/currency";
@@ -37,11 +38,11 @@ export default function DashboardModule({ companyId, userName, companyName, perm
 
   // ── Datos de Inventario (Catálogo) y Movimientos ────────────────────────────
   const [garments,     loadingProd] = useGarments(companyId);
-  const [transactions, loadingTx]   = useMockTransactions(companyId);
+  const [transactions, loadingTx]   = useTransactions(companyId);
 
   // ── Datos de Proveedores (todavía en Firestore, sin migrar) ─────────────────
-  const [suppliers,     loadingSup] = useCollection(companyId, "suppliers",     "name");
-  const [supplierSales, loadingSS]  = useCollection(companyId, "supplierSales", "createdAt");
+  const [suppliers, loadingSup] = useSupabaseList(subscribeToSuppliers, companyId);
+  const [supplierReturns, loadingSR] = useSupabaseList(subscribeToSupplierReturns, companyId);
 
   // ── Datos de Almacén ─────────────────────────────────────────────────────────
   const { locations, stock: warehouseStock, loading: loadingWh } = useWarehouseData(perms.verAlmacen ? companyId : null);
@@ -106,13 +107,13 @@ export default function DashboardModule({ companyId, userName, companyName, perm
   const sup = useMemo(() => ({
     total:    suppliers.length,
     active:   suppliers.filter(s => s.status === "Activo").length,
-    pending:  supplierSales.filter(s => s.status === "Pendiente").length,
-  }), [suppliers, supplierSales]);
+    pending:  supplierReturns.filter(r => r.status === "Pendiente").length,
+  }), [suppliers, supplierReturns]);
 
   const loading =
     (perms.verInventario || perms.registrarVentas || perms.registrarCompras) && (loadingProd || loadingTx) ||
     perms.verAlmacen && loadingWh ||
-    perms.verProveedores && (loadingSup || loadingSS);
+    perms.verProveedores && (loadingSup || loadingSR);
 
   if (loading) {
     return (
@@ -137,7 +138,7 @@ export default function DashboardModule({ companyId, userName, companyName, perm
       tone: "amber", nav: "warehouse",
     },
     perms.verProveedores && sup.pending > 0 && {
-      icon: <Clock size={14} />, label: `${sup.pending} venta${sup.pending === 1 ? "" : "s"} a proveedor pendiente${sup.pending === 1 ? "" : "s"}`,
+      icon: <Clock size={14} />, label: `${sup.pending} devolución${sup.pending === 1 ? "" : "es"} a proveedor pendiente${sup.pending === 1 ? "" : "s"}`,
       tone: "sky", nav: "suppliers",
     },
   ].filter(Boolean);

@@ -5,7 +5,7 @@
 // se reemplace por llamadas a Supabase, este hook no cambia.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { subscribeToGarments } from "../services/mock/garmentsStore";
+import { subscribeToGarments } from "../services/supabase/garmentsStore";
 
 export function useGarments(companyId) {
   const [items, setItems] = useState([]);

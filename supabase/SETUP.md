@@ -1,6 +1,6 @@
 # Supabase — guía de instalación desde cero
 
-Esto te deja el backend de Invenxio corriendo en Supabase. Se hace una sola
+Esto te deja el backend de VestiFlow corriendo en Supabase. Se hace una sola
 vez por proyecto (o dos: una para desarrollo, otra para producción — ver
 nota al final).
 

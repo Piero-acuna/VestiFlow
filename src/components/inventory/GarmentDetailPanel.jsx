@@ -3,12 +3,12 @@
 // Slide-over de detalle de una prenda: galería de fotos, info, tabla de
 // variantes con ajuste de stock por talla/color, historial y baja.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X, Edit3, Trash2, ArrowUpCircle, ArrowDownCircle, Loader2,
   AlertTriangle, History, Package,
 } from "lucide-react";
-import { adjustVariantStock, deleteGarment } from "../../services/mock/garmentsStore";
+import { adjustVariantStock, deleteGarment, subscribeToGarmentHistory } from "../../services/supabase/garmentsStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { StatusBadge } from "../shared/StatusUI";
 import { BarcodeDisplay } from "../BarcodeUI";
@@ -26,7 +26,11 @@ export default function GarmentDetailPanel({ garment, companyId, userName, curre
   const [adjustError, setAdjustError] = useState("");
 
   const images = garment.images || [];
-  const history = [...(garment.history || [])].reverse();
+  const [history, setHistory] = useState([]);
+  useEffect(() => {
+    const unsub = subscribeToGarmentHistory(companyId, garment.id, setHistory);
+    return unsub;
+  }, [companyId, garment.id]);
 
   async function handleAdjust(variant) {
     const qty = Number(adjustQty);

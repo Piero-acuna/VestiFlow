@@ -479,7 +479,7 @@ function BillingTab({ billing, onSave }) {
         </div>
       )}
 
-      <FieldMini label="Razón Social / Nombre del negocio *" value={form.razonSocial} onChange={v => set("razonSocial", v)} placeholder="Ej: Invenxio E.I.R.L." />
+      <FieldMini label="Razón Social / Nombre del negocio *" value={form.razonSocial} onChange={v => set("razonSocial", v)} placeholder="Ej: VestiFlow E.I.R.L." />
       <div className="grid grid-cols-2 gap-2">
         <FieldMini label="RUC / DNI" value={form.ruc} onChange={v => set("ruc", v)} placeholder="20123456789" />
         <FieldMini label="Serie comprobante" value={form.serie} onChange={v => set("serie", v.toUpperCase())} placeholder="F001" />

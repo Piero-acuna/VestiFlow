@@ -4,10 +4,10 @@
 // movimientos (entrada/salida/traslado) y su historial. Ya no mantiene un
 // catálogo de "productos de almacén" separado — todo referencia las mismas
 // variantes (SKU talla+color) del Catálogo (ver components/warehouse/*.jsx
-// y services/mock/warehouseStore.js para el porqué).
+// y services/supabase/warehouseStore.js para el porqué).
 //
-// Fuente de datos: mock (localStorage) mientras no hay backend — cuando se
-// conecte Supabase, useWarehouseData() y este archivo no cambian.
+// Fuente de datos: Supabase real. useWarehouseData() no cambia si algún día
+// cambia lo de adentro de warehouseStore.js.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { MapPin, ArrowLeftRight, History as HistoryIcon } from "lucide-react";

@@ -13,7 +13,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { getNextInvoiceNumber } from "../services/firestoreService";
+import { getNextInvoiceNumber } from "../services/supabase/companyStore";
 import { exportToExcel } from "../utils/exportExcel";
 import { generateInvoicePDF } from "../utils/generateInvoicePDF";
 import { Spinner } from "./shared/StatusUI";
@@ -92,8 +92,8 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
 
       warehouseMovements.forEach(m => {
         const reason = m.reason || "";
-        if (m.type === "entrada" && reason.startsWith("Compra a proveedor")) return; // ya está como "compra"
-        if (m.type === "salida"  && reason.startsWith("Venta a proveedor"))  return; // ya está como "venta_proveedor"
+        if (m.type === "entrada" && reason.startsWith("Compra a "))     return; // ya está como "compra" (transactions)
+        if (m.type === "salida"  && reason.startsWith("Devolución a ")) return; // ya está como "venta_proveedor" (supplierSales)
         items.push({
           id: `wm-${m.id}`,
           source: "Almacén",
@@ -265,7 +265,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
       base["Nota"] = t.note || "";
       return base;
     });
-    exportToExcel(rows, "Invenxio_Historial_Movimientos", "Movimientos");
+    exportToExcel(rows, "VestiFlow_Historial_Movimientos", "Movimientos");
   }
 
   // Genera (o re-imprime) el comprobante PDF de una transacción individual.

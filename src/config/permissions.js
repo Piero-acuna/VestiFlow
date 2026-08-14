@@ -1,4 +1,4 @@
-// src/config/permissions.js — Sistema de permisos granulares de Invenxio
+// src/config/permissions.js — Sistema de permisos granulares de VestiFlow
 
 export const PERMISSION_GROUPS = [
   {

@@ -11,14 +11,19 @@ import { useState, useRef } from "react";
 import { ImagePlus, X, Star, Loader2 } from "lucide-react";
 import { filesToImages } from "../../utils/imageFile";
 
-export default function ImageUploader({ images, onChange }) {
+export default function ImageUploader({ images, onChange, companyId }) {
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
   const inputRef = useRef(null);
 
   async function handleFiles(fileList) {
     setProcessing(true);
-    const newImages = await filesToImages(fileList);
+    setError("");
+    const newImages = await filesToImages(fileList, companyId);
+    if (newImages.length === 0 && fileList?.length > 0) {
+      setError("No se pudo subir la(s) foto(s). Intenta de nuevo.");
+    }
     onChange([...images, ...newImages.map(img => ({ id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, ...img }))]);
     setProcessing(false);
   }
@@ -52,6 +57,8 @@ export default function ImageUploader({ images, onChange }) {
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
           onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
       </div>
+
+      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
 
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-3">

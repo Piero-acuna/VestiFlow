@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo } from "react";
 import { ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
-import { addWarehouseMovement } from "../../services/mock/warehouseStore";
+import { addWarehouseMovement } from "../../services/supabase/warehouseStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { flattenAllVariants } from "../../utils/variants";
 import VariantPicker from "./VariantPicker";

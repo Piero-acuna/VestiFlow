@@ -11,7 +11,7 @@ import {
   Plus, X, Edit3, Trash2, MapPin, Search, CheckCircle,
   ChevronDown, Send, Loader2, Boxes, Package,
 } from "lucide-react";
-import { addLocation, updateLocation, deleteLocation, sendToSalesFloor } from "../../services/mock/warehouseStore";
+import { addLocation, updateLocation, deleteLocation, sendToSalesFloor } from "../../services/supabase/warehouseStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { EmptyState } from "../shared/StatusUI";
 import ColorSwatch from "../inventory/ColorSwatch";

@@ -13,13 +13,15 @@ import {
   Search, Plus, ShoppingCart, Package, AlertTriangle, CheckCircle,
   Minus, Trash2, Zap, Clock, BookOpen, Loader2, ScanBarcode,
 } from "lucide-react";
-import { recordGarmentSale } from "../services/mock/garmentsStore";
-import { getNextInvoiceNumberMock } from "../services/mock/transactionsStore";
+import { recordGarmentSale } from "../services/supabase/garmentsStore";
+import { getNextInvoiceNumber } from "../services/supabase/companyStore";
 import { generateInvoicePDF } from "../utils/generateInvoicePDF";
 import { logAndGetErrorMessage } from "../utils/errors";
 import { useGarments } from "../hooks/useGarments";
-import { useMockTransactions } from "../hooks/useMockTransactions";
-import { useCollection } from "../hooks/useCollection";
+import { useTransactions } from "../hooks/useTransactions";
+import { useSupabaseList } from "../hooks/useSupabaseList";
+import { subscribeToSupplierReturns } from "../services/supabase/suppliersStore";
+import { useWarehouseData } from "../hooks/useWarehouseData";
 import { Spinner } from "../components/shared/StatusUI";
 import TransactionHistory from "../components/TransactionHistory";
 import { BarcodeScanner } from "../components/BarcodeUI";
@@ -36,12 +38,20 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
   const { companyCurrency } = useAuth();
   const currencySymbol = companyCurrency.currencySymbol;
   const [garments,     loadingG] = useGarments(companyId);
-  const [transactions, loadingT] = useMockTransactions(companyId);
-  // Almacén y Proveedores todavía no se migraron a la capa mock — siguen
-  // apuntando a Firestore, así que estas dos fuentes del Historial general
-  // quedan vacías hasta que se adapten (ver conversación).
-  const [warehouseMovements] = useCollection(companyId, "warehouseMovements", "createdAt");
-  const [supplierSales]      = useCollection(companyId, "supplierSales",     "createdAt");
+  const [transactions, loadingT] = useTransactions(companyId);
+  const [supplierReturns] = useSupabaseList(subscribeToSupplierReturns, companyId);
+  const { movements: warehouseMovements } = useWarehouseData(companyId);
+
+  // TransactionHistory espera la forma vieja de "supplierSales" (product,
+  // sku, packName…) — se traduce acá en vez de tocar ese componente
+  // compartido, que ya sirve bien para Inventario/Almacén tal cual está.
+  const supplierSales = useMemo(() => supplierReturns.map(r => ({
+    id: r.id, date: r.date, time: r.time,
+    product: r.garmentName, sku: r.variantSku,
+    description: `Talla ${r.talla} · ${r.color}`,
+    qty: r.qty, packName: "", total: r.total,
+    supplier: r.supplierName, status: r.status, note: r.note,
+  })), [supplierReturns]);
 
   const sellable = useMemo(() => flattenSellableVariants(garments), [garments]);
 
@@ -109,7 +119,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
         setInvoiceMsg("Venta guardada, pero no se generó comprobante: completa tus Datos de Facturación en el Panel.");
       } else {
         try {
-          const invoiceNumber = getNextInvoiceNumberMock(companyId);
+          const invoiceNumber = await getNextInvoiceNumber(companyId);
           generateInvoicePDF({
             billing,
             docType: "VENTA",

@@ -1,52 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // api/culqi-charge.js
-// Función serverless de Vercel (se despliega sola, no requiere configuración
-// extra — cualquier archivo dentro de /api se convierte en un endpoint,
-// aquí queda como POST /api/culqi-charge).
+// Función serverless de Vercel — POST /api/culqi-charge.
 //
 // ESTE ES EL ÚNICO LUGAR DE TODO EL PROYECTO QUE PUEDE MARCAR UNA EMPRESA
-// COMO "PAGADA". Corre en el servidor de Vercel, nunca en el navegador del
-// usuario, por dos razones de seguridad:
+// COMO "PAGADA". Corre en el servidor, nunca en el navegador, por dos
+// razones:
+//  1. Necesita la CULQI_SECRET_KEY para cobrar de verdad.
+//  2. Escribe en `subscriptions`, que las políticas de RLS bloquean para
+//     cualquier usuario autenticado normal (ver supabase/schema.sql) — solo
+//     la service_role key puede escribir ahí, y esa key SOLO vive acá.
 //
-//  1. Necesita la CULQI_SECRET_KEY para cobrar de verdad — esa llave nunca
-//     debe existir en código que corra en el navegador (cualquiera podría
-//     leerla y cobrar/reembolsar con tu cuenta de Culqi).
-//  2. Usa Firebase Admin SDK, que ignora las reglas de Firestore a propósito
-//     — es la ÚNICA forma de escribir companies/{id}/meta/subscription,
-//     porque firestore.rules bloquea esa escritura para cualquier usuario
-//     normal (ver el comentario ahí). Si esta lógica viviera en el cliente,
-//     cualquier persona con la consola del navegador podría llamarla
-//     directamente y "pagarse" gratis sin cobrar nada de verdad.
-//
-// VARIABLES DE ENTORNO QUE NECESITA (configúralas en Vercel → Settings →
-// Environment Variables — NUNCA las pongas en un archivo del repo):
-//   CULQI_SECRET_KEY        → la Llave Secreta de tu cuenta Culqi (sk_live_… o sk_test_…)
-//   FIREBASE_PROJECT_ID     → el project_id del archivo JSON de tu cuenta de servicio
-//   FIREBASE_CLIENT_EMAIL   → el client_email de ese mismo archivo
-//   FIREBASE_PRIVATE_KEY    → el private_key de ese mismo archivo (con los \n literales)
-//
-// Cómo conseguir el archivo de cuenta de servicio de Firebase:
-//   Consola de Firebase → ⚙️ Configuración del proyecto → Cuentas de
-//   servicio → "Generar nueva clave privada". Copia project_id, client_email
-//   y private_key a esas 3 variables en Vercel (el private_key trae saltos
-//   de línea "\n" dentro del texto — Vercel los soporta si los pegas tal
-//   cual, entre comillas).
+// VARIABLES DE ENTORNO (Vercel → Settings → Environment Variables):
+//   CULQI_SECRET_KEY            → Llave Secreta de Culqi (sk_live_… o sk_test_…)
+//   VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY → ver api/_lib/supabaseAdmin.js
 // ─────────────────────────────────────────────────────────────────────────────
-import admin from "firebase-admin";
-
-// La app de Admin SDK se inicializa UNA sola vez por instancia "caliente" de
-// la función — Vercel puede reusar el mismo proceso entre invocaciones.
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId:  process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Vercel guarda los saltos de línea como el texto literal "\n" — hay
-      // que devolverlos a saltos de línea reales antes de usarlos.
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getSupabaseAdmin } from "./_lib/supabaseAdmin.js";
+import { verifyOwner } from "./_lib/verifyOwner.js";
 
 const PLAN_AMOUNT_CENTS = 5499; // S/ 54.99 — debe coincidir con PLAN_AMOUNT_CENTS de PaywallScreen.jsx
 const PLAN_DAYS = 30;
@@ -56,68 +25,55 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Método no permitido" });
   }
 
+  let admin;
   try {
-    // 1. Verificar identidad: el token de Firebase Auth que manda el
-    //    navegador PRUEBA quién es el usuario — nunca confiamos en
-    //    "companyId" solo porque vino en el body, sin este paso cualquiera
-    //    podría mandar el companyId de otra empresa y pagarle su plan.
-    const authHeader = req.headers.authorization || "";
-    const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (!idToken) return res.status(401).json({ ok: false, error: "Falta autenticación." });
+    admin = getSupabaseAdmin();
+  } catch (err) {
+    console.error("culqi-charge config error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
 
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    const { token, companyId } = req.body || {};
+  try {
+    // 1. Verificar identidad — el companyId sale del propio token, nunca
+    //    del body, así nadie puede pagar la suscripción de otra empresa.
+    const { user, profile } = await verifyOwner(req, admin);
+    const companyId = profile.company_id;
 
-    if (!token || !companyId) {
-      return res.status(400).json({ ok: false, error: "Faltan datos del pago." });
-    }
-    // En esta app, companyId == uid del Dueño fundador (ver createCompany
-    // en firestoreService.js) — así que solo el propio Dueño puede pagar la
-    // suscripción de SU empresa, nunca la de otra.
-    if (decoded.uid !== companyId) {
-      return res.status(403).json({ ok: false, error: "No puedes pagar la suscripción de otra empresa." });
-    }
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ ok: false, error: "Faltan datos del pago." });
 
     // 2. Cobrar de verdad con Culqi, usando la llave SECRETA (server-side).
     const culqiRes = await fetch("https://api.culqi.com/v2/charges", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CULQI_SECRET_KEY}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CULQI_SECRET_KEY}` },
       body: JSON.stringify({
         amount: PLAN_AMOUNT_CENTS,
         currency_code: "PEN",
-        email: decoded.email || "sin-email@invenxio.app",
+        email: user.email || "sin-email@invenxio.app",
         source_id: token,
-        description: "Suscripción mensual Invenxio",
+        description: "Suscripción mensual VestiFlow",
         metadata: { companyId },
       }),
     });
     const charge = await culqiRes.json();
 
     if (!culqiRes.ok) {
-      // Culqi devuelve el motivo del rechazo en `user_message` (ya en
-      // español, seguro de mostrar tal cual al usuario).
       return res.status(402).json({ ok: false, error: charge.user_message || charge.merchant_message || "El cobro fue rechazado." });
     }
 
-    // 3. Cobro confirmado → recién ACÁ se marca la empresa como pagada,
-    //    30 días desde ahora. Esta es la única escritura de todo el sistema
-    //    a este documento (ver firestore.rules: el cliente nunca puede).
+    // 3. Cobro confirmado → recién ACÁ se marca la empresa como pagada.
     const paidUntil = new Date(Date.now() + PLAN_DAYS * 24 * 60 * 60 * 1000);
-    await admin.firestore()
-      .doc(`companies/${companyId}/meta/subscription`)
-      .set({
-        status: "active",
-        plan: "monthly",
-        paidUntil: paidUntil.toISOString(),
-        lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastChargeId: charge.id,
-      }, { merge: true });
+    const { error: subErr } = await admin.from("subscriptions").update({
+      status: "active", plan: "monthly",
+      paid_until: paidUntil.toISOString(),
+      last_charge_id: String(charge.id),
+      updated_at: new Date().toISOString(),
+    }).eq("company_id", companyId);
+    if (subErr) throw subErr;
 
     return res.status(200).json({ ok: true });
   } catch (err) {
+    if (err?.status) return res.status(err.status).json({ ok: false, error: err.message });
     console.error("culqi-charge error:", err);
     return res.status(500).json({ ok: false, error: "Error interno al procesar el pago. Si tu tarjeta fue cargada, contáctanos." });
   }

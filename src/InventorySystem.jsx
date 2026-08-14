@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// src/InventorySystem.jsx  –  Invenxio v4.1
+// src/InventorySystem.jsx  –  VestiFlow
 //
 // Punto de entrada del sistema una vez autenticado: header, pestañas visibles
 // según permisos, panel de equipo/facturación (RolePanel) y el módulo activo.
@@ -13,14 +13,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, lazy, Suspense } from "react";
 import {
-  AlertTriangle, Box, LogOut, Loader2, Warehouse,
+  AlertTriangle, LogOut, Loader2, Warehouse,
   Package, BarChart2, Truck, LayoutDashboard,
 } from "lucide-react";
+import { LogoMark } from "./components/shared/Logo";
 import { useAuth } from "./contexts/AuthContext";
 import {
   subscribeToEmployees, updateUserPermissions, setEmployeeActive,
   subscribeToCompany, updateCompanyBilling, updateCompanyCountry, subscribeToSubscription,
-} from "./services/firestoreService";
+} from "./services/supabase/companyStore";
 import { getCountryConfig } from "./config/countryConfig";
 import RolePanel, { RoleBadge } from "./components/RolePanel";
 import { hasPermission, canSeeTab, TAB_DEFS } from "./config/permissions";
@@ -41,7 +42,7 @@ const SuppliersModule  = lazy(() => import("./modules/SuppliersModule"));
 const WarehouseModule  = lazy(() => import("./WarehouseModule"));
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ROOT — Invenxio
+// ROOT — VestiFlow
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Loader liviano mientras se descarga el chunk del módulo elegido.
@@ -54,7 +55,7 @@ function ModuleLoader() {
 }
 
 export default function InventoryApp() {
-  const { currentUser, userProfile, companyName, companyCurrency, setCompanyCurrency, logout, registerEmployee } = useAuth();
+  const { currentUser, userProfile, companyName, companyCurrency, setCompanyCurrency, logout, registerEmployee, getIdToken } = useAuth();
   const companyId = userProfile?.companyId;
   const userName  = userProfile?.name || currentUser?.email || "Usuario";
   const isOwner   = userProfile?.role === "owner";
@@ -176,12 +177,11 @@ export default function InventoryApp() {
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 bg-amber-500 rounded-lg flex items-center justify-center shadow-md shadow-amber-500/30">
-                  <Box size={14} className="text-slate-900" />
+                  <LogoMark size={16} className="text-slate-900" />
                 </div>
                 <div className="hidden xs:block sm:block">
-                  <span className="font-extrabold text-white text-sm sm:text-base tracking-tight">Inven</span>
-                  <span className="font-extrabold text-amber-400 text-sm sm:text-base tracking-tight">xio</span>
-                  <span className="text-xs text-slate-600 ml-1 font-mono">v1</span>
+                  <span className="font-extrabold text-white text-sm sm:text-base tracking-tight">Vesti</span>
+                  <span className="font-extrabold text-amber-400 text-sm sm:text-base tracking-tight">Flow</span>
                 </div>
               </div>
               <RoleBadge role={userProfile?.role} />
@@ -237,7 +237,7 @@ export default function InventoryApp() {
             isOwner={userProfile?.role === "owner"}
             companyId={companyId}
             companyName={companyName}
-            getIdToken={() => currentUser.getIdToken()}
+            getIdToken={getIdToken}
             reason={blockReason}
             paymentGateway={companyCurrency.paymentGateway}
           />

@@ -1,13 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// src/components/auth/Login.jsx  —  Invenxio
+// src/components/auth/Login.jsx  —  VestiFlow
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from "react";
 import {
   Mail, Lock, User, Building2, Eye, EyeOff,
   ArrowRight, RefreshCw, AlertCircle, CheckCircle,
-  ChevronLeft, Layers, Globe,
+  ChevronLeft, Globe,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { LogoMark } from "./shared/Logo";
 import { COUNTRIES } from "../config/countryConfig";
 
 // ── Ícono Google SVG ──────────────────────────────────────────────────────────
@@ -144,14 +145,14 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-500 rounded-2xl shadow-lg shadow-amber-500/30 mb-4">
-            <Layers size={26} className="text-slate-900" />
+            <LogoMark size={28} className="text-slate-900" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight">
-            <span className="text-white">Inven</span>
-            <span className="text-amber-400">xio</span>
+            <span className="text-white">Vesti</span>
+            <span className="text-amber-400">Flow</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-mono uppercase tracking-widest">
-            Gestión de Inventarios
+            Tu tienda de ropa, ordenada
           </p>
         </div>
 
@@ -172,7 +173,7 @@ export default function Login() {
             <h2 className="text-lg font-bold text-white">{titles[mode]}</h2>
             <p className="text-xs text-slate-400 mt-0.5">
               {mode === "login"    && "Accede a tu panel de inventario"}
-              {mode === "register" && "Crea tu empresa en Invenxio"}
+              {mode === "register" && "Crea tu empresa en VestiFlow"}
               {mode === "reset"    && "Te enviaremos un enlace a tu correo"}
             </p>
           </div>

@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/utils/errors.js
 // Manejo de errores centralizado para todo lo que NO es autenticación
-// (AuthContext.jsx ya tiene su propio friendlyError() para códigos de
-// Firebase Auth — un dominio distinto, con sus propios códigos).
+// (AuthContext.jsx tiene su propio friendlyError() para los mensajes de
+// Supabase Auth — un dominio distinto, con sus propios textos).
 //
 // Antes, cada módulo repetía el mismo patrón suelto:
 //   catch (err) {
@@ -10,63 +10,48 @@
 //     setError(err?.message || "Error al guardar. Revisa la consola.");
 //   }
 // El problema con `err?.message` a secas es que, cuando el error viene de
-// Firestore (permisos, red, límites), ese mensaje es texto técnico en inglés
-// ("Missing or insufficient permissions.") — nada útil para quien está
-// vendiendo en el mostrador. Este archivo centraliza la traducción:
-//   - Si el error trae un `code` de Firebase/Firestore (permission-denied,
-//     unavailable, etc.), se traduce a un mensaje en español.
+// Postgres/PostgREST (violación de una restricción, RLS, etc.), ese mensaje
+// es texto técnico en inglés — nada útil para quien está vendiendo en el
+// mostrador. Este archivo centraliza la traducción:
+//   - Si el error trae un `code` de Postgres (23505, 23503…) o de PostgREST
+//     (PGRST301…), se traduce a un mensaje en español.
 //   - Si es un error que TIRAMOS nosotros mismos (`throw new Error("Stock
-//     insuficiente para...")`, sin `code`), su mensaje ya está en español y
-//     se usa tal cual — es información específica que sí vale la pena mostrar.
+//     insuficiente para...")`, o un `raise exception` de una función SQL,
+//     que llega sin `code`), su mensaje ya está en español y se usa tal
+//     cual — es información específica que sí vale la pena mostrar.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FIRESTORE_ERROR_MESSAGES = {
-  "permission-denied":    "No tienes permiso para hacer esto.",
-  "unauthenticated":      "Tu sesión expiró. Vuelve a iniciar sesión.",
-  "unavailable":          "Sin conexión con el servidor. Verifica tu internet e intenta de nuevo.",
-  "not-found":            "El registro que buscas ya no existe.",
-  "already-exists":       "Ya existe un registro con esos datos.",
-  "resource-exhausted":   "Se alcanzó un límite del sistema. Intenta más tarde.",
-  "deadline-exceeded":    "La operación tardó demasiado. Intenta de nuevo.",
-  "cancelled":            "La operación fue cancelada.",
-  "aborted":              "No se pudo completar por un conflicto (alguien más lo modificó al mismo tiempo). Intenta de nuevo.",
-  "failed-precondition":  "No se puede completar esta acción en el estado actual.",
-  "invalid-argument":     "Algunos datos ingresados no son válidos.",
-  "internal":             "Ocurrió un error interno. Intenta de nuevo.",
-  "data-loss":            "Ocurrió un error leyendo los datos. Intenta de nuevo.",
-
-  // Códigos de Firebase Auth más comunes que también puede recibir la UI
-  // fuera de AuthContext.jsx (ej. al registrar un empleado desde RolePanel,
-  // donde el error se relanza después de que AuthContext ya seteó su propio
-  // authError). AuthContext.jsx sigue teniendo su friendlyError() propio,
-  // más completo, para el flujo de login/registro principal — esta lista es
-  // solo un respaldo para no mostrar texto técnico en inglés en otros lados.
-  "auth/email-already-in-use": "Ese correo ya está registrado.",
-  "auth/weak-password":        "La contraseña debe tener al menos 6 caracteres.",
-  "auth/invalid-email":        "Correo electrónico inválido.",
-  "auth/network-request-failed": "Error de red. Verifica tu conexión.",
+// Códigos SQLSTATE de Postgres (los que realmente pueden aparecer acá, dado
+// lo que las tablas de supabase/schema.sql restringen) + los de PostgREST.
+const DB_ERROR_MESSAGES = {
+  "23505": "Ya existe un registro con esos datos (por ejemplo, un SKU repetido).",
+  "23503": "No se puede completar: hay datos relacionados que lo impiden.",
+  "23502": "Faltan datos obligatorios.",
+  "23514": "Alguno de los datos ingresados no es válido.",
+  "42501": "No tienes permiso para hacer esto.",
+  "PGRST301": "Tu sesión expiró. Vuelve a iniciar sesión.",
+  "PGRST116": "El registro que buscas ya no existe.",
 };
 
 const DEFAULT_FALLBACK = "Ocurrió un error. Inténtalo de nuevo.";
 
 /**
- * Traduce cualquier error (de Firestore/Firebase, o uno propio tirado con
- * `throw new Error("...")`) a un mensaje en español listo para mostrar.
+ * Traduce cualquier error (de Postgres/Supabase, o uno propio tirado con
+ * `throw new Error("...")` / `raise exception` en una función SQL) a un
+ * mensaje en español listo para mostrar.
  *
- * - Errores de Firebase/Firestore (traen `err.code`): se traducen con el
+ * - Errores de la base de datos (traen `err.code`): se traducen con el
  *   diccionario de arriba. Un código no mapeado cae al `fallback` en vez de
  *   mostrar texto técnico en inglés.
- * - Errores propios (sin `err.code`, como los que tira recordSale cuando no
- *   alcanza el stock): se muestra `err.message` tal cual, porque ya lo
- *   escribimos nosotros en español y suele ser información específica y
- *   accionable ("Solo hay 3 Cajas disponibles en esa ubicación").
+ * - Errores propios, incluyendo los `raise exception '...'` de las
+ *   funciones de supabase/schema.sql (llegan sin `code` reconocido, o con
+ *   uno genérico pero con `err.message` ya en español): se muestra
+ *   `err.message` tal cual — es información específica y accionable
+ *   ("Solo hay 3 unidades disponibles en esa ubicación").
  */
 export function getErrorMessage(err, fallback = DEFAULT_FALLBACK) {
   if (!err) return fallback;
-  if (err.code) {
-    const code = String(err.code).replace(/^firestore\//, "");
-    return FIRESTORE_ERROR_MESSAGES[code] || fallback;
-  }
+  if (err.code && DB_ERROR_MESSAGES[err.code]) return DB_ERROR_MESSAGES[err.code];
   return err.message || fallback;
 }
 
@@ -81,3 +66,4 @@ export function logAndGetErrorMessage(err, context, fallback = DEFAULT_FALLBACK)
   console.error(context, err);
   return getErrorMessage(err, fallback);
 }
+

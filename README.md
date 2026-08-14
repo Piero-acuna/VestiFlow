@@ -1,16 +1,35 @@
-# React + Vite
+# VestiFlow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Inventario, ventas y almacén para tiendas de ropa — catálogo con variantes de talla y color, punto de venta, control de almacén multi-ubicación y proveedores, todo con fotos reales de cada prenda.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend**: React 19 + Vite + Tailwind
+- **Backend**: [Supabase](https://supabase.com) (Postgres + Auth + Storage + Realtime)
+- **Pagos**: Culqi / Mercado Pago (según país)
 
-## React Compiler
+## Primeros pasos
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. `npm install`
+2. Sigue [`supabase/SETUP.md`](./supabase/SETUP.md) para crear tu proyecto de Supabase, correr el esquema (`supabase/schema.sql`) y obtener tus llaves.
+3. Copia `.env.local.example` a `.env.local` y completa las variables.
+4. `npm run dev`
 
-## Expanding the ESLint configuration
+## Estructura
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+src/
+  modules/            Catálogo, Movimientos (POS), Dashboard, Proveedores
+  WarehouseModule.jsx Almacén
+  components/         UI por dominio (inventory/, warehouse/, suppliers/, shared/)
+  services/supabase/  Toda la lectura/escritura a Supabase — mismos nombres
+                       de función en cada store, para que cambiar lo de
+                       adentro nunca obligue a tocar un componente
+  config/             Categorías de prenda, tallas, colores, permisos, países
+supabase/
+  schema.sql           Tablas, RLS, triggers y funciones transaccionales
+  SETUP.md             Guía paso a paso desde cero
+api/
+  *.js                 Funciones serverless (pagos, alta de empleados) —
+                        las únicas que usan la service_role key de Supabase
+```

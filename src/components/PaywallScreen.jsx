@@ -120,7 +120,7 @@ export default function PaywallScreen({ isOwner, companyId, companyName, getIdTo
       }
       window.Culqi.publicKey = publicKey;
       window.Culqi.settings({
-        title: companyName || "Invenxio",
+        title: companyName || "VestiFlow",
         currency: "PEN",
         amount: PLAN_AMOUNT_CENTS,
       });
@@ -174,7 +174,7 @@ export default function PaywallScreen({ isOwner, companyId, companyName, getIdTo
       </h2>
       <p className="text-sm text-slate-400 max-w-sm mb-6">
         {isOwner
-          ? "Para seguir usando Invenxio, activa tu plan mensual. Tus datos siguen guardados y seguros — no se pierde nada."
+          ? "Para seguir usando VestiFlow, activa tu plan mensual. Tus datos siguen guardados y seguros — no se pierde nada."
           : "Pídele al Dueño de tu empresa que renueve la suscripción para poder seguir trabajando aquí."}
       </p>
 

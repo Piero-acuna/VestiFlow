@@ -79,3 +79,8 @@ export function getColorConfig(colorId) {
   return COLOR_PALETTE.find(c => c.id === colorId)
     || { id: colorId, label: colorId || "—", hex: "#64748b" };
 }
+
+// ── Categorías de proveedor ───────────────────────────────────────────────────
+// Deben coincidir exactamente con el check constraint de la tabla `suppliers`
+// en supabase/schema.sql.
+export const SUPPLIER_CATEGORIES = ["Telas", "Confección/Maquila", "Calzado", "Accesorios", "Insumos y Avíos", "Otro"];
