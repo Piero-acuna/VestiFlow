@@ -5,7 +5,7 @@
 // firestoreService.js). Compras y devoluciones corren como funciones
 // transaccionales en Postgres (ver supabase/schema.sql, sección 6).
 // ─────────────────────────────────────────────────────────────────────────────
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, uniqueChannel } from "../../lib/supabaseClient";
 
 // ── Proveedores ──────────────────────────────────────────────────────────────
 export function subscribeToSuppliers(companyId, onData) {
@@ -21,8 +21,7 @@ export function subscribeToSuppliers(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`suppliers-${companyId}`)
+  const channel = uniqueChannel(`suppliers-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "suppliers", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -57,8 +56,7 @@ export function subscribeToSupplierPurchases(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`supplier_purchases-${companyId}`)
+  const channel = uniqueChannel(`supplier_purchases-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "supplier_purchases", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -88,8 +86,7 @@ export function subscribeToSupplierReturns(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`supplier_returns-${companyId}`)
+  const channel = uniqueChannel(`supplier_returns-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "supplier_returns", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);

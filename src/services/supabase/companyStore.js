@@ -13,7 +13,7 @@
 // que algo cambia — para el tamaño de datos de este módulo (un puñado de
 // empleados, una fila de empresa) es más simple y sigue siendo instantáneo.
 // ─────────────────────────────────────────────────────────────────────────────
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, uniqueChannel } from "../../lib/supabaseClient";
 import { getCountryConfig } from "../../config/countryConfig";
 
 // ── Equipo (profiles) ────────────────────────────────────────────────────────
@@ -33,8 +33,7 @@ export function subscribeToEmployees(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`profiles-${companyId}`)
+  const channel = uniqueChannel(`profiles-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -64,8 +63,7 @@ export function subscribeToCompany(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`companies-${companyId}`)
+  const channel = uniqueChannel(`companies-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "companies", filter: `id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -99,8 +97,7 @@ export function subscribeToSubscription(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`subscriptions-${companyId}`)
+  const channel = uniqueChannel(`subscriptions-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "subscriptions", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);

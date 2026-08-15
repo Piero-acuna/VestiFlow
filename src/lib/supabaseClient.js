@@ -30,3 +30,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+/**
+ * Crea un canal de Realtime con un nombre SIEMPRE único. Supabase reutiliza
+ * el canal ya existente si dos llamadas usan el mismo nombre — así que si
+ * dos componentes distintos (ej. Dashboard e Inventario) suscriben a
+ * `garments` al mismo tiempo con el nombre fijo `garments-{companyId}`, la
+ * segunda suscripción intenta agregar más `.on(...)` a un canal que el
+ * primero ya dejó en estado `subscribed`, y eso tira exactamente el error
+ * "cannot add postgres_changes callbacks... after subscribe()". Agregar un
+ * sufijo aleatorio a cada llamada le da a cada suscriptor su propio canal
+ * independiente, sin tocar cómo se usa `supabase.channel(...)` en el resto
+ * del código (mismo `.on(...).subscribe()` de siempre).
+ */
+export function uniqueChannel(name) {
+  return supabase.channel(`${name}-${Math.random().toString(36).slice(2, 10)}`);
+}

@@ -4,7 +4,7 @@
 // puente "enviar a venta" corren como funciones transaccionales en Postgres
 // (ver supabase/schema.sql, sección 6) — acá solo se arman los parámetros.
 // ─────────────────────────────────────────────────────────────────────────────
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, uniqueChannel } from "../../lib/supabaseClient";
 
 // ── Ubicaciones ──────────────────────────────────────────────────────────────
 export function subscribeToLocations(companyId, onData) {
@@ -19,8 +19,7 @@ export function subscribeToLocations(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`wh_locations-${companyId}`)
+  const channel = uniqueChannel(`wh_locations-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_locations", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -59,8 +58,7 @@ export function subscribeToWarehouseStock(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`wh_stock-${companyId}`)
+  const channel = uniqueChannel(`wh_stock-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_stock", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
@@ -85,8 +83,7 @@ export function subscribeToWarehouseMovements(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`wh_movements-${companyId}`)
+  const channel = uniqueChannel(`wh_movements-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_movements", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);

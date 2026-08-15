@@ -12,7 +12,7 @@
 // sección 6) — este archivo es una capa delgada que arma los parámetros y
 // llama a `supabase.rpc(...)`.
 // ─────────────────────────────────────────────────────────────────────────────
-import { supabase } from "../../lib/supabaseClient";
+import { supabase, uniqueChannel } from "../../lib/supabaseClient";
 import { garmentStatus } from "../../utils/variants";
 
 function mapGarment(row) {
@@ -51,8 +51,7 @@ export function subscribeToGarments(companyId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`garments-${companyId}`)
+  const channel = uniqueChannel(`garments-${companyId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "garments", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .on("postgres_changes", { event: "*", schema: "public", table: "garment_variants", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
     .subscribe();
@@ -164,8 +163,7 @@ export function subscribeToGarmentHistory(companyId, garmentId, onData) {
   }
 
   fetchAndNotify();
-  const channel = supabase
-    .channel(`garment_history-${garmentId}`)
+  const channel = uniqueChannel(`garment_history-${garmentId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "garment_history", filter: `garment_id=eq.${garmentId}` }, fetchAndNotify)
     .subscribe();
   return () => supabase.removeChannel(channel);
