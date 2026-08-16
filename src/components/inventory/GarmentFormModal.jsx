@@ -4,9 +4,10 @@
 // de variantes (talla × color). Mismo layout en 4 secciones que ya usaba el
 // formulario de producto genérico, para que se sienta como el mismo sistema.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Plus, Edit3, Loader2, Save } from "lucide-react";
 import { addGarment, updateGarment } from "../../services/supabase/garmentsStore";
+import { getNextSku } from "../../services/supabase/companyStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { calcProfit, calcMarginPercent } from "../../utils/finance";
 import { formatMoney } from "../../utils/currency";
@@ -15,11 +16,11 @@ import ImageUploader from "./ImageUploader";
 import VariantMatrix from "./VariantMatrix";
 
 const emptyForm = {
-  name: "", brand: "", sku: "", category: CATEGORIES[0].id, description: "",
+  name: "", brand: "", sku: "", category: CATEGORIES[0].label, description: "",
   price: "", cost: "", minStock: "2", images: [],
 };
 
-export default function GarmentFormModal({ companyId, userName, garment, currencySymbol, canViewFinance, onClose }) {
+export default function GarmentFormModal({ companyId, userName, garment, garments = [], currencySymbol, canViewFinance, onClose }) {
   const isEdit = !!garment;
   const [form, setForm] = useState(() => isEdit ? {
     name: garment.name, brand: garment.brand || "", sku: garment.sku, category: garment.category,
@@ -29,13 +30,35 @@ export default function GarmentFormModal({ companyId, userName, garment, currenc
   const [variants, setVariants] = useState(garment?.variants || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [loadingSku, setLoadingSku] = useState(!isEdit);
+
+  // SKU automático — 001, 002, 003… por empresa (ver next_sku() en
+  // supabase/schema.sql). Ya no se escribe a mano: se pide apenas se abre
+  // el formulario de una prenda NUEVA, y al editar se muestra el que ya
+  // tenía (nunca cambia, porque las variantes ya están armadas sobre él).
+  useEffect(() => {
+    if (isEdit) return;
+    let active = true;
+    getNextSku(companyId).then(sku => { if (active) { setForm(f => ({ ...f, sku })); setLoadingSku(false); } })
+      .catch(err => { if (active) { setError(logAndGetErrorMessage(err, "Error al generar SKU:")); setLoadingSku(false); } });
+    return () => { active = false; };
+  }, [isEdit, companyId]);
+
+  // Sugerencias de categoría: las predefinidas + las que ya usaste en otras
+  // prendas (para que categorías que agregaste a mano aparezcan también).
+  const categorySuggestions = useMemo(() => {
+    const set = new Set(CATEGORIES.map(c => c.label));
+    garments.forEach(g => { if (g.category) set.add(g.category); });
+    return [...set];
+  }, [garments]);
 
   const sizes = getSizesForCategory(form.category);
   const set = (key) => (value) => setForm(f => ({ ...f, [key]: value }));
 
   async function handleSave() {
+    if (loadingSku) { setError("Espera a que se genere el SKU."); return; }
     if (!form.name || !form.sku || variants.length === 0) {
-      setError(variants.length === 0 ? "Agrega al menos una talla y un color." : "Completa nombre y SKU.");
+      setError(variants.length === 0 ? "Agrega al menos una talla y un color." : "Completa el nombre de la prenda.");
       return;
     }
     setSaving(true); setError("");
@@ -87,10 +110,13 @@ export default function GarmentFormModal({ companyId, userName, garment, currenc
               </div>
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">Categoría</label>
-                <select value={form.category} onChange={e => set("category")(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500 transition-colors">
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
+                <input list="category-suggestions" value={form.category} onChange={e => set("category")(e.target.value)}
+                  placeholder="Ej: Camisas, o la tuya…"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+                <datalist id="category-suggestions">
+                  {categorySuggestions.map(c => <option key={c} value={c} />)}
+                </datalist>
+                <p className="text-[10px] text-slate-500 mt-1">Elige una o escribe la tuya propia</p>
               </div>
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">Marca</label>
@@ -98,10 +124,13 @@ export default function GarmentFormModal({ companyId, userName, garment, currenc
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">SKU base *</label>
-                <p className="text-[10px] text-slate-500 mb-1">El SKU de cada talla/color se arma solo a partir de este</p>
-                <input value={form.sku} onChange={e => set("sku")(e.target.value)} placeholder="Ej: POLO-001"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+                <label className="text-xs text-slate-400 mb-1 block">SKU</label>
+                <p className="text-[10px] text-slate-500 mb-1">Automático — el de cada talla/color se arma a partir de este</p>
+                <div className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm font-mono flex items-center gap-2">
+                  {loadingSku
+                    ? <><Loader2 size={12} className="animate-spin text-slate-500" /><span className="text-slate-500">Generando…</span></>
+                    : <span className="text-slate-300">{form.sku}</span>}
+                </div>
               </div>
               <div className="col-span-2">
                 <label className="text-xs text-slate-400 mb-1 block">Descripción</label>
@@ -174,7 +203,7 @@ export default function GarmentFormModal({ companyId, userName, garment, currenc
 
         <div className="flex gap-3 p-5 border-t border-slate-700 flex-shrink-0">
           <button onClick={onClose} className="flex-1 py-2.5 border border-slate-600 text-slate-400 rounded-xl text-sm hover:border-slate-500 transition-colors">Cancelar</button>
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={saving || loadingSku}
             className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
             {saving && <Loader2 size={14} className="animate-spin" />}<Save size={14} />{isEdit ? "Guardar Cambios" : "Guardar Prenda"}
           </button>

@@ -37,8 +37,19 @@ export const CATEGORIES = [
   { id: "ropa_infantil",     label: "Ropa Infantil",        sizeSet: "infantil" },
 ];
 
-export function getCategoryConfig(categoryId) {
-  return CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[0];
+/**
+ * Busca una categoría por id (formato viejo) o por nombre (formato nuevo,
+ * ver conversación: las categorías ahora son texto libre — el usuario puede
+ * escribir la suya). Si no coincide con ninguna categoría conocida, se trata
+ * el texto tal cual como su propia categoría "custom", con el set de tallas
+ * más común (ropa) como default razonable.
+ */
+export function getCategoryConfig(category) {
+  if (!category) return CATEGORIES[0];
+  const norm = String(category).trim().toLowerCase();
+  const known = CATEGORIES.find(c => c.id === category || c.label.toLowerCase() === norm);
+  if (known) return known;
+  return { id: category, label: category, sizeSet: "ropa" };
 }
 
 export function getSizesForCategory(categoryId) {

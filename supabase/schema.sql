@@ -36,6 +36,7 @@ create table if not exists public.companies (
   currency_symbol text not null default 'S/',
   billing         jsonb not null default '{}'::jsonb,   -- razón social, RUC/tax id, dirección…
   invoice_counter integer not null default 0,
+  sku_counter     integer not null default 0,
   created_at      timestamptz not null default now()
 );
 
@@ -797,6 +798,25 @@ begin
     where id = v_company_id
     returning invoice_counter into v_next;
   return v_next;
+end;
+$$;
+
+-- SKU automático para prendas nuevas: 001, 002, 003… por empresa. `for
+-- update` evita que dos altas de prenda al mismo tiempo se lleven el mismo
+-- número (mismo criterio que next_invoice_number()).
+create or replace function public.next_sku()
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  v_company_id uuid := auth_company_id();
+  v_next integer;
+begin
+  if not has_permission('crear_productos') then
+    raise exception 'No tienes permiso para crear prendas.';
+  end if;
+  update public.companies set sku_counter = sku_counter + 1
+    where id = v_company_id
+    returning sku_counter into v_next;
+  return lpad(v_next::text, 3, '0');
 end;
 $$;
 

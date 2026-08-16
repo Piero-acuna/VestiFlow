@@ -8,14 +8,15 @@
 // tarjeta del catálogo; se puede reordenar arrastrando o con el botón ★.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef } from "react";
-import { ImagePlus, X, Star, Loader2 } from "lucide-react";
+import { ImagePlus, Camera, X, Star, Loader2 } from "lucide-react";
 import { filesToImages } from "../../utils/imageFile";
 
 export default function ImageUploader({ images, onChange, companyId }) {
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
-  const inputRef = useRef(null);
+  const uploadInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   async function handleFiles(fileList) {
     setProcessing(true);
@@ -43,18 +44,37 @@ export default function ImageUploader({ images, onChange, companyId }) {
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer flex flex-col items-center justify-center gap-1.5 py-6 rounded-xl border-2 border-dashed text-center transition-colors ${
-          dragOver ? "border-amber-500 bg-amber-500/5" : "border-slate-700 hover:border-slate-600"
+        className={`flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed text-center transition-colors ${
+          dragOver ? "border-amber-500 bg-amber-500/5" : "border-slate-700"
         }`}>
-        {processing
-          ? <Loader2 size={20} className="animate-spin text-amber-400" />
-          : <ImagePlus size={20} className="text-slate-500" />}
-        <p className="text-xs text-slate-400">
-          {processing ? "Procesando fotos…" : "Arrastra fotos aquí o haz clic para elegir"}
-        </p>
-        <p className="text-[10px] text-slate-600">La primera foto es la portada del catálogo</p>
-        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+        {processing ? (
+          <>
+            <Loader2 size={20} className="animate-spin text-amber-400" />
+            <p className="text-xs text-slate-400">Procesando fotos…</p>
+          </>
+        ) : (
+          <>
+            <ImagePlus size={20} className="text-slate-500" />
+            <p className="text-xs text-slate-400">Arrastra fotos aquí, o…</p>
+            <div className="flex gap-2 mt-1">
+              <button type="button" onClick={() => uploadInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs font-medium text-slate-200 transition-colors">
+                <ImagePlus size={13} /> Subir fotos
+              </button>
+              <button type="button" onClick={() => cameraInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs font-medium text-slate-200 transition-colors">
+                <Camera size={13} /> Tomar foto
+              </button>
+            </div>
+          </>
+        )}
+        <p className="text-[10px] text-slate-600 mt-1">La primera foto es la portada del catálogo</p>
+
+        {/* Subir desde galería/archivos — varias a la vez */}
+        <input ref={uploadInputRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
+        {/* Cámara directa — en celulares abre la cámara en vez del selector de archivos */}
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
           onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
       </div>
 

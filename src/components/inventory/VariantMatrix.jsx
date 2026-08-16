@@ -15,6 +15,15 @@ import { buildVariantMatrix } from "../../utils/variants";
 import ColorSwatch from "./ColorSwatch";
 
 export default function VariantMatrix({ availableSizes, baseSku, initialVariants = [], onChange }) {
+  // Tallas propias que el usuario agregó a mano — arrancan con las que ya
+  // traía la prenda (si alguna no está en el set predefinido de su
+  // categoría) para no perderlas al editar.
+  const [customSizes, setCustomSizes] = useState(() =>
+    [...new Set(initialVariants.map(v => v.talla))].filter(t => !availableSizes.includes(t))
+  );
+  const [newSize, setNewSize] = useState("");
+  const allSizes = [...availableSizes, ...customSizes];
+
   const [selectedSizes, setSelectedSizes] = useState(() =>
     initialVariants.length ? [...new Set(initialVariants.map(v => v.talla))] : []
   );
@@ -35,6 +44,13 @@ export default function VariantMatrix({ availableSizes, baseSku, initialVariants
 
   function toggleSize(size) {
     setSelectedSizes(s => s.includes(size) ? s.filter(x => x !== size) : [...s, size]);
+  }
+  function addCustomSize() {
+    const size = newSize.trim();
+    if (!size) return;
+    if (!allSizes.some(s => s.toLowerCase() === size.toLowerCase())) setCustomSizes(s => [...s, size]);
+    if (!selectedSizes.includes(size)) setSelectedSizes(s => [...s, size]);
+    setNewSize("");
   }
   function addColor(colorId) {
     if (!selectedColors.includes(colorId)) setSelectedColors(c => [...c, colorId]);
@@ -57,8 +73,8 @@ export default function VariantMatrix({ availableSizes, baseSku, initialVariants
       {/* ── Tallas ── */}
       <div>
         <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Tallas disponibles</p>
-        <div className="flex flex-wrap gap-1.5">
-          {availableSizes.map(size => (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {allSizes.map(size => (
             <button key={size} type="button" onClick={() => toggleSize(size)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                 selectedSizes.includes(size)
@@ -68,6 +84,16 @@ export default function VariantMatrix({ availableSizes, baseSku, initialVariants
               {size}
             </button>
           ))}
+          <div className="flex items-center gap-1">
+            <input value={newSize} onChange={e => setNewSize(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomSize(); } }}
+              placeholder="Otra talla…" maxLength={12}
+              className="w-24 px-2 py-1.5 bg-slate-900 border border-dashed border-slate-600 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors" />
+            <button type="button" onClick={addCustomSize} disabled={!newSize.trim()}
+              className="p-1.5 rounded-lg border border-dashed border-slate-600 text-slate-400 hover:border-amber-500 hover:text-amber-400 disabled:opacity-40 transition-colors">
+              <Plus size={12} />
+            </button>
+          </div>
         </div>
       </div>
 

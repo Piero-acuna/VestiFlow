@@ -114,3 +114,10 @@ export async function getNextInvoiceNumber(_companyId) {
   if (error) throw error;
   return data;
 }
+
+/** SKU automático para una prenda nueva: "001", "002"… por empresa (ver next_sku() en schema.sql). */
+export async function getNextSku(_companyId) {
+  const { data, error } = await supabase.rpc("next_sku");
+  if (error) throw error;
+  return data;
+}

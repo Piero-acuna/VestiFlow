@@ -32,6 +32,12 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
   const [showForm, setShowForm] = useState(false);
   const [editingGarment, setEditingGarment] = useState(null);
 
+  const categoryOptions = useMemo(() => {
+    const set = new Set(CATEGORIES.map(c => c.label));
+    garments.forEach(g => { if (g.category) set.add(g.category); });
+    return [...set].sort();
+  }, [garments]);
+
   const filtered = useMemo(() => garments.filter(g => {
     const q = search.toLowerCase();
     const matchesSearch = !q || g.name?.toLowerCase().includes(q) || g.sku?.toLowerCase().includes(q) || g.brand?.toLowerCase().includes(q);
@@ -76,7 +82,7 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
           className="px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-amber-500 transition-colors">
           <option value="Todas">Todas las categorías</option>
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+          {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <div className="flex gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
           {["Todos", ...STOCK_STATUS].map(s => (
@@ -125,6 +131,7 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
           companyId={companyId}
           userName={userName}
           garment={editingGarment}
+          garments={garments}
           currencySymbol={currencySymbol}
           canViewFinance={canViewFinance}
           onClose={closeForm}
