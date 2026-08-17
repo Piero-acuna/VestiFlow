@@ -39,6 +39,11 @@ create table if not exists public.companies (
   sku_counter     integer not null default 0,
   created_at      timestamptz not null default now()
 );
+-- `create table if not exists` NO agrega columnas nuevas a una tabla que ya
+-- existía de una corrida anterior de este script — por eso cualquier
+-- columna que se sume después de la primera vez necesita su propio ALTER
+-- acá, con IF NOT EXISTS para que sea seguro re-correr el archivo.
+alter table public.companies add column if not exists sku_counter integer not null default 0;
 
 -- Suscripción/pago — tabla APARTE de companies a propósito: el usuario
 -- autenticado puede LEER su fila, pero solo el backend de pagos (service_role,

@@ -5,9 +5,11 @@
 // formulario de producto genérico, para que se sienta como el mismo sistema.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useMemo } from "react";
-import { X, Plus, Edit3, Loader2, Save } from "lucide-react";
+import { X, Plus, Edit3, Loader2, Save, Store, Warehouse } from "lucide-react";
 import { addGarment, updateGarment } from "../../services/supabase/garmentsStore";
 import { getNextSku } from "../../services/supabase/companyStore";
+import { addWarehouseMovement } from "../../services/supabase/warehouseStore";
+import { useWarehouseData } from "../../hooks/useWarehouseData";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { calcProfit, calcMarginPercent } from "../../utils/finance";
 import { formatMoney } from "../../utils/currency";
@@ -31,6 +33,14 @@ export default function GarmentFormModal({ companyId, userName, garment, garment
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loadingSku, setLoadingSku] = useState(!isEdit);
+
+  // Destino del stock inicial — solo aplica al crear una prenda nueva. "venta"
+  // (default) deja el stock cargado en la matriz directamente vendible, como
+  // siempre. "almacen" lo manda a una ubicación de Almacén en vez de al piso
+  // de venta — la prenda queda "Agotada" hasta que la envíes desde ahí.
+  const { locations } = useWarehouseData(isEdit ? null : companyId);
+  const [stockDestination, setStockDestination] = useState("venta");
+  const [locationId, setLocationId] = useState("");
 
   // SKU automático — 001, 002, 003… por empresa (ver next_sku() en
   // supabase/schema.sql). Ya no se escribe a mano: se pide apenas se abre
@@ -61,6 +71,9 @@ export default function GarmentFormModal({ companyId, userName, garment, garment
       setError(variants.length === 0 ? "Agrega al menos una talla y un color." : "Completa el nombre de la prenda.");
       return;
     }
+    const toWarehouse = !isEdit && stockDestination === "almacen";
+    if (toWarehouse && !locationId) { setError("Elige a qué ubicación de almacén va el stock."); return; }
+
     setSaving(true); setError("");
     const payload = {
       name: form.name, brand: form.brand, sku: form.sku, category: form.category,
@@ -68,14 +81,33 @@ export default function GarmentFormModal({ companyId, userName, garment, garment
       price: Number(form.price) || 0,
       cost: Number(form.cost) || 0,
       images: form.images,
-      variants: variants.map(v => ({ ...v, minStock: Number(form.minStock) || 0 })),
+      // Si el stock va a almacén, la prenda arranca con 0 vendible en cada
+      // variante — recién queda disponible para vender cuando se envíe desde
+      // Almacén (mismo flujo que "Enviar a Venta").
+      variants: variants.map(v => ({ ...v, stock: toWarehouse ? 0 : v.stock, minStock: Number(form.minStock) || 0 })),
     };
     try {
+      let garmentId;
       if (isEdit) {
         await updateGarment(companyId, garment.id, payload);
+        garmentId = garment.id;
       } else {
-        await addGarment(companyId, { ...payload, createdBy: userName });
+        garmentId = await addGarment(companyId, { ...payload, createdBy: userName });
       }
+
+      if (toWarehouse) {
+        const location = locations.find(l => l.id === locationId);
+        const withStock = variants.filter(v => (Number(v.stock) || 0) > 0);
+        for (const v of withStock) {
+          await addWarehouseMovement(companyId, {
+            type: "entrada", variantSku: v.sku, garmentId, garmentName: form.name,
+            talla: v.talla, color: v.color, qty: Number(v.stock),
+            toLocationId: locationId, toLocationName: location?.name || "",
+            reason: "Alta de prenda nueva", userName,
+          });
+        }
+      }
+
       onClose();
     } catch (err) {
       setError(logAndGetErrorMessage(err, "Error al guardar prenda:"));
@@ -197,6 +229,43 @@ export default function GarmentFormModal({ companyId, userName, garment, garment
             </div>
             <VariantMatrix availableSizes={sizes} baseSku={form.sku || "SKU"} initialVariants={variants} onChange={setVariants} />
           </div>
+
+          {/* Destino del stock inicial (solo al crear) */}
+          {!isEdit && (
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">¿Dónde va este stock?</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setStockDestination("venta")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-colors ${
+                    stockDestination === "venta" ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-700 text-slate-400 hover:border-slate-500"
+                  }`}>
+                  <Store size={14} /> Piso de venta
+                </button>
+                <button type="button" onClick={() => setStockDestination("almacen")} disabled={locations.length === 0}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    stockDestination === "almacen" ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-700 text-slate-400 hover:border-slate-500"
+                  }`}>
+                  <Warehouse size={14} /> Almacén
+                </button>
+              </div>
+              {locations.length === 0 && (
+                <p className="text-[11px] text-slate-500 mt-1.5">Todavía no tienes ubicaciones de almacén — créalas primero en el módulo Almacén si quieres usar esta opción.</p>
+              )}
+              {stockDestination === "venta" && (
+                <p className="text-[11px] text-slate-500 mt-1.5">El stock que cargaste arriba queda disponible para vender de inmediato.</p>
+              )}
+              {stockDestination === "almacen" && (
+                <div className="mt-2">
+                  <select value={locationId} onChange={e => setLocationId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500 transition-colors">
+                    <option value="">Elegir ubicación…</option>
+                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1.5">La prenda queda "Agotada" en el catálogo hasta que envíes stock desde Almacén al piso de venta.</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg">{error}</p>}
         </div>
