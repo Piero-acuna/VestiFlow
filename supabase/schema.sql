@@ -144,10 +144,17 @@ create table if not exists public.transactions (
   total       numeric(10,2) not null default 0,
   client      text,
   supplier    text,
+  payment_method text check (payment_method in ('efectivo','transferencia')),
   note        text,
   created_by  text,
   created_at  timestamptz not null default now()
 );
+-- Ver nota junto a companies más arriba: ALTER explícito para que sea
+-- seguro re-correr este archivo sobre una base que ya tenía la tabla.
+alter table public.transactions add column if not exists payment_method text;
+alter table public.transactions drop constraint if exists transactions_payment_method_check;
+alter table public.transactions add constraint transactions_payment_method_check
+  check (payment_method in ('efectivo','transferencia'));
 create index if not exists transactions_company_id_idx on public.transactions(company_id);
 create index if not exists transactions_date_idx on public.transactions(company_id, date);
 
@@ -239,12 +246,17 @@ create table if not exists public.supplier_purchases (
   qty            integer not null,
   unit_cost      numeric(10,2) not null,
   total          numeric(10,2) not null,
+  payment_method text check (payment_method in ('efectivo','transferencia')),
   note           text,
   user_name      text,
   date           date not null default current_date,
   time           text,
   created_at     timestamptz not null default now()
 );
+alter table public.supplier_purchases add column if not exists payment_method text;
+alter table public.supplier_purchases drop constraint if exists supplier_purchases_payment_method_check;
+alter table public.supplier_purchases add constraint supplier_purchases_payment_method_check
+  check (payment_method in ('efectivo','transferencia'));
 create index if not exists supplier_purchases_company_id_idx on public.supplier_purchases(company_id);
 create index if not exists supplier_purchases_supplier_id_idx on public.supplier_purchases(supplier_id);
 
@@ -637,7 +649,7 @@ $$;
 -- manipulado abriendo la consola del navegador (mismo criterio que ya
 -- tenía recordSale() en services/firestore/transactions.js).
 create or replace function public.record_garment_sale(
-  p_items jsonb, p_user_name text, p_client_name text default 'Cliente'
+  p_items jsonb, p_user_name text, p_client_name text default 'Cliente', p_payment_method text default 'efectivo'
 ) returns void language plpgsql security definer set search_path = public as $$
 declare
   v_company_id uuid := auth_company_id();
@@ -649,6 +661,9 @@ declare
 begin
   if not has_permission('registrar_ventas') then
     raise exception 'No tienes permiso para registrar ventas.';
+  end if;
+  if p_payment_method not in ('efectivo','transferencia') then
+    raise exception 'Método de pago inválido.';
   end if;
 
   -- 1) Validar TODO primero (bloquea las filas con FOR UPDATE para que dos
@@ -684,13 +699,13 @@ begin
       p_user_name
     );
 
-    insert into public.transactions (company_id, type, date, time, product, sku, description, qty, unit_price, total, client, created_by)
+    insert into public.transactions (company_id, type, date, time, product, sku, description, qty, unit_price, total, client, payment_method, created_by)
     values (
       v_company_id, 'venta', v_today, v_time, v_garment.name, v_variant.sku,
       'Talla ' || v_variant.talla || ' · ' || v_variant.color,
       (v_item->>'qty')::integer, v_garment.price,
       v_garment.price * (v_item->>'qty')::integer,
-      p_client_name, p_user_name
+      p_client_name, p_payment_method, p_user_name
     );
 
     perform public.recompute_garment_status(v_variant.garment_id);
@@ -832,7 +847,7 @@ create or replace function public.record_supplier_purchase(
   p_supplier_id uuid, p_supplier_name text,
   p_variant_sku text, p_garment_id uuid, p_garment_name text, p_talla text, p_color text,
   p_location_id uuid, p_location_name text,
-  p_qty integer, p_unit_cost numeric, p_note text, p_user_name text
+  p_qty integer, p_unit_cost numeric, p_note text, p_user_name text, p_payment_method text default 'efectivo'
 ) returns void language plpgsql security definer set search_path = public as $$
 declare
   v_company_id uuid := auth_company_id();
@@ -842,6 +857,9 @@ declare
 begin
   if not has_permission('gestionar_proveedores') then
     raise exception 'No tienes permiso para registrar compras a proveedor.';
+  end if;
+  if p_payment_method not in ('efectivo','transferencia') then
+    raise exception 'Método de pago inválido.';
   end if;
 
   insert into public.warehouse_stock (company_id, variant_sku, garment_id, garment_name, talla, color, location_id, qty)
@@ -857,19 +875,19 @@ begin
     p_location_id, p_location_name, 'Compra a ' || p_supplier_name, p_user_name, v_time
   );
 
-  insert into public.transactions (company_id, type, date, time, product, sku, description, qty, unit_price, total, supplier, note, created_by)
+  insert into public.transactions (company_id, type, date, time, product, sku, description, qty, unit_price, total, supplier, payment_method, note, created_by)
   values (
     v_company_id, 'compra', v_today, v_time, p_garment_name, p_variant_sku,
     'Talla ' || p_talla || ' · ' || p_color, p_qty, p_unit_cost, v_total,
-    p_supplier_name, p_note, p_user_name
+    p_supplier_name, p_payment_method, p_note, p_user_name
   );
 
   insert into public.supplier_purchases (
     company_id, supplier_id, supplier_name, variant_sku, garment_id, garment_name, talla, color,
-    location_id, location_name, qty, unit_cost, total, note, user_name, date, time
+    location_id, location_name, qty, unit_cost, total, payment_method, note, user_name, date, time
   ) values (
     v_company_id, p_supplier_id, p_supplier_name, p_variant_sku, p_garment_id, p_garment_name, p_talla, p_color,
-    p_location_id, p_location_name, p_qty, p_unit_cost, v_total, p_note, p_user_name, v_today, v_time
+    p_location_id, p_location_name, p_qty, p_unit_cost, v_total, p_payment_method, p_note, p_user_name, v_today, v_time
   );
 end;
 $$;

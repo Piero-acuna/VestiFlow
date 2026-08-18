@@ -69,6 +69,7 @@ export async function recordSupplierPurchase(companyId, payload) {
     p_talla: payload.talla, p_color: payload.color,
     p_location_id: payload.locationId, p_location_name: payload.locationName,
     p_qty: payload.qty, p_unit_cost: payload.unitCost, p_note: payload.note || null, p_user_name: payload.userName,
+    p_payment_method: payload.paymentMethod || "efectivo",
   });
   if (error) throw error;
 }
@@ -120,7 +121,7 @@ function mapPurchaseOrReturn(row) {
     talla: row.talla, color: row.color,
     locationId: row.location_id, locationName: row.location_name,
     qty: row.qty, unitCost: Number(row.unit_cost) || 0, unitPrice: Number(row.unit_price) || 0,
-    total: Number(row.total) || 0, status: row.status, note: row.note,
+    total: Number(row.total) || 0, status: row.status, note: row.note, paymentMethod: row.payment_method,
     userName: row.user_name, date: row.date, time: row.time, createdAt: row.created_at,
   };
 }

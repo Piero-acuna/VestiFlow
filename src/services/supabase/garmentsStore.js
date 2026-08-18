@@ -138,10 +138,10 @@ export async function adjustVariantStock(companyId, garmentId, variantSku, { typ
 }
 
 /** Venta completa del carrito — transacción atómica en Postgres (record_garment_sale). */
-export async function recordGarmentSale(companyId, { cartItems, userName, clientName = "Cliente" }) {
+export async function recordGarmentSale(companyId, { cartItems, userName, clientName = "Cliente", paymentMethod = "efectivo" }) {
   const { error } = await supabase.rpc("record_garment_sale", {
     p_items: cartItems.map(i => ({ sku: i.variantSku || i.sku, qty: i.qty })),
-    p_user_name: userName, p_client_name: clientName || "Cliente",
+    p_user_name: userName, p_client_name: clientName || "Cliente", p_payment_method: paymentMethod,
   });
   if (error) throw error;
 }

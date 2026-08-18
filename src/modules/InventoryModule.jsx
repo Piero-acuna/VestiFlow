@@ -12,7 +12,6 @@ import { Search, Plus, Shirt, CheckCircle, AlertTriangle, X } from "lucide-react
 import { useAuth } from "../contexts/AuthContext";
 import { useGarments } from "../hooks/useGarments";
 import { Spinner, StatusBadge, STOCK_STATUS, EmptyState } from "../components/shared/StatusUI";
-import { CATEGORIES } from "../config/clothingConfig";
 import GarmentCard from "../components/inventory/GarmentCard";
 import GarmentFormModal from "../components/inventory/GarmentFormModal";
 import GarmentDetailPanel from "../components/inventory/GarmentDetailPanel";
@@ -33,7 +32,7 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
   const [editingGarment, setEditingGarment] = useState(null);
 
   const categoryOptions = useMemo(() => {
-    const set = new Set(CATEGORIES.map(c => c.label));
+    const set = new Set();
     garments.forEach(g => { if (g.category) set.add(g.category); });
     return [...set].sort();
   }, [garments]);

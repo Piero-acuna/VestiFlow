@@ -70,6 +70,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
   const [sSaving,      setSSaving]      = useState(false);
   const [sSuccess,     setSSuccess]     = useState(false);
   const [clientName,   setClientName]   = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [invoiceMsg,   setInvoiceMsg]   = useState("");
   const [saleError,    setSaleError]    = useState("");
   const [showScanner,  setShowScanner]  = useState(false);
@@ -111,7 +112,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
     setInvoiceMsg("");
     setSaleError("");
     try {
-      await recordGarmentSale(companyId, { cartItems: cart, userName, clientName: clientName.trim() || "Cliente" });
+      await recordGarmentSale(companyId, { cartItems: cart, userName, clientName: clientName.trim() || "Cliente", paymentMethod });
       setSSuccess(true);
 
       // ── Emitir comprobante de venta en PDF (sin terceros) ──
@@ -140,7 +141,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
         }
       }
 
-      setTimeout(() => { setSSuccess(false); setCart([]); setClientName(""); setInvoiceMsg(""); }, 3500);
+      setTimeout(() => { setSSuccess(false); setCart([]); setClientName(""); setPaymentMethod("efectivo"); setInvoiceMsg(""); }, 3500);
     } catch (err) {
       setSaleError(logAndGetErrorMessage(err, "Error al registrar la venta:", "No se pudo registrar la venta. Intenta de nuevo."));
     }
@@ -272,6 +273,19 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
                 <label className="text-xs text-slate-400 uppercase tracking-wider mb-1.5 block">Cliente (opcional)</label>
                 <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Cliente varios"
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+              </div>
+              <div className="mb-4">
+                <label className="text-xs text-slate-400 uppercase tracking-wider mb-1.5 block">Método de pago</label>
+                <div className="flex gap-2">
+                  {[{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }].map(m => (
+                    <button key={m.id} type="button" onClick={() => setPaymentMethod(m.id)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        paymentMethod === m.id ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"
+                      }`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex justify-between items-center mb-4">
                 <span className="text-slate-400 text-sm">Total</span>

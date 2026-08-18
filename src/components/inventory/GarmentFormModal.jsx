@@ -13,12 +13,12 @@ import { useWarehouseData } from "../../hooks/useWarehouseData";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { calcProfit, calcMarginPercent } from "../../utils/finance";
 import { formatMoney } from "../../utils/currency";
-import { CATEGORIES, getSizesForCategory } from "../../config/clothingConfig";
+import { getSizesForCategory } from "../../config/clothingConfig";
 import ImageUploader from "./ImageUploader";
 import VariantMatrix from "./VariantMatrix";
 
 const emptyForm = {
-  name: "", brand: "", sku: "", category: CATEGORIES[0].label, description: "",
+  name: "", brand: "", sku: "", category: "", description: "",
   price: "", cost: "", minStock: "2", images: [],
 };
 
@@ -54,12 +54,13 @@ export default function GarmentFormModal({ companyId, userName, garment, garment
     return () => { active = false; };
   }, [isEdit, companyId]);
 
-  // Sugerencias de categoría: las predefinidas + las que ya usaste en otras
-  // prendas (para que categorías que agregaste a mano aparezcan también).
+  // Sugerencias de categoría: SOLO las que ya usaste en otras prendas — nada
+  // de una lista predefinida, para que el desplegable refleje exactamente lo
+  // que tu tienda ya tiene creado.
   const categorySuggestions = useMemo(() => {
-    const set = new Set(CATEGORIES.map(c => c.label));
+    const set = new Set();
     garments.forEach(g => { if (g.category) set.add(g.category); });
-    return [...set];
+    return [...set].sort();
   }, [garments]);
 
   const sizes = getSizesForCategory(form.category);

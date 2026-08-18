@@ -27,7 +27,7 @@ import SupplierFormModal from "../components/suppliers/SupplierFormModal";
 import { useAuth } from "../contexts/AuthContext";
 
 const EMPTY_SUPPLIER = { name: "", ruc: "", category: "Telas", contact: "", phone: "", address: "", status: "Activo" };
-const EMPTY_PURCHASE = { supplierId: "", variant: null, locationId: "", qty: "", unitCost: "", note: "" };
+const EMPTY_PURCHASE = { supplierId: "", variant: null, locationId: "", qty: "", unitCost: "", paymentMethod: "efectivo", note: "" };
 const EMPTY_RETURN   = { supplierId: "", variant: null, locationId: "", qty: "", unitPrice: "", note: "" };
 
 const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, canViewFinance, billing }) => {
@@ -98,7 +98,7 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
 
   async function handlePurchaseSubmit() {
     setPError(""); setPMsg("");
-    const { supplierId, variant, locationId, qty, unitCost, note } = pForm;
+    const { supplierId, variant, locationId, qty, unitCost, paymentMethod, note } = pForm;
     if (!supplierId || !variant || !locationId || !qty || !unitCost) { setPError("Completa todos los campos obligatorios."); return; }
     setPSaving(true);
     try {
@@ -110,7 +110,7 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
         variantSku: variant.variantSku, garmentId: variant.garmentId, garmentName: variant.name,
         talla: variant.talla, color: variant.color,
         locationId, locationName: location?.name || "",
-        qty: n, unitCost: cost, note, userName,
+        qty: n, unitCost: cost, paymentMethod, note, userName,
       });
       setPSuccess(true);
       await emitInvoice({ partyName: supplier?.name, items: [{ name: variant.name, description: `Talla ${variant.talla}`, qty: n, unitPrice: cost, total: n * cost }], total: n * cost, note });

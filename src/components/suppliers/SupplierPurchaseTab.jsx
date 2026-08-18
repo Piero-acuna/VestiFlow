@@ -50,6 +50,20 @@ export default function SupplierPurchaseTab({
         </div>
 
         <div>
+          <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 block">Método de pago</label>
+          <div className="flex gap-2">
+            {[{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }].map(m => (
+              <button key={m.id} type="button" onClick={() => set("paymentMethod")(m.id)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  form.paymentMethod === m.id ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-700 text-slate-400 hover:border-slate-500"
+                }`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 block">Nota (opcional)</label>
           <input value={form.note} onChange={e => set("note")(e.target.value)} placeholder="N° de guía, observaciones…"
             className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors" />
