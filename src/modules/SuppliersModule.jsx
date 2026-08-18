@@ -86,11 +86,11 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
     catch (err) { alert(logAndGetErrorMessage(err, "Error al eliminar proveedor:")); }
   }
 
-  async function emitInvoice({ partyName, items, total, note }) {
+  async function emitInvoice({ partyName, items, total, note, paymentMethod }) {
     if (!billing?.razonSocial) return;
     try {
       const invoiceNumber = await getNextInvoiceNumber(companyId);
-      generateInvoicePDF({ billing, docType: "PROVEEDOR", partyLabel: "Proveedor", partyName, items, total, note: note || "", invoiceNumber, currencySymbol });
+      generateInvoicePDF({ billing, docType: "PROVEEDOR", partyLabel: "Proveedor", partyName, items, total, note: note || "", invoiceNumber, currencySymbol, paymentMethod });
     } catch (err) {
       console.error("Error generando comprobante:", err);
     }
@@ -113,7 +113,7 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
         qty: n, unitCost: cost, paymentMethod, note, userName,
       });
       setPSuccess(true);
-      await emitInvoice({ partyName: supplier?.name, items: [{ name: variant.name, description: `Talla ${variant.talla}`, qty: n, unitPrice: cost, total: n * cost }], total: n * cost, note });
+      await emitInvoice({ partyName: supplier?.name, items: [{ name: variant.name, description: `Talla ${variant.talla}`, qty: n, unitPrice: cost, total: n * cost }], total: n * cost, note, paymentMethod: pForm.paymentMethod });
       setTimeout(() => { setPSuccess(false); setPForm(EMPTY_PURCHASE); }, 3000);
     } catch (err) {
       setPError(logAndGetErrorMessage(err, "Error al registrar compra:"));

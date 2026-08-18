@@ -53,7 +53,7 @@ function setText(pdf, c) { pdf.setTextColor(c[0], c[1], c[2]); }
  */
 export function generateInvoicePDF({
   billing, docType = "VENTA", partyLabel = "Cliente", partyName = "",
-  items = [], total = 0, invoiceNumber, note = "", currencySymbol = "S/",
+  items = [], total = 0, invoiceNumber, note = "", currencySymbol = "S/", paymentMethod,
 }) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = 210;
@@ -199,10 +199,20 @@ export function generateInvoicePDF({
   pdf.line(marginX, y, rightX, y);
   y += 8;
 
-  // ── Total destacado ──
+  // ── Total destacado (+ forma de pago, si se indicó) ──
   const totalBoxW = 68, totalBoxH = 13;
   const totalBoxX = rightX - totalBoxW;
   if (y + totalBoxH > 272) { addLegalFooter(); pdf.addPage(); paintHeaderBand(); y = 20; }
+  if (paymentMethod) {
+    setText(pdf, COLOR.sub);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(7.5);
+    pdf.text("FORMA DE PAGO", marginX, y + 5);
+    setText(pdf, COLOR.ink);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.text(paymentMethod === "transferencia" ? "Transferencia" : "Efectivo", marginX, y + 10.5);
+  }
   setFill(pdf, COLOR.ink);
   pdf.roundedRect(totalBoxX, y, totalBoxW, totalBoxH, 1.5, 1.5, "F");
   setText(pdf, COLOR.white);

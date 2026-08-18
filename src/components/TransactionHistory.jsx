@@ -261,6 +261,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
       if (canViewFinance && t.amount != null) {
         base[`Total (${currencySymbol})`] = Number(t.amount.toFixed(2));
       }
+      base["Pago"] = t.raw?.paymentMethod ? (t.raw.paymentMethod === "transferencia" ? "Transferencia" : "Efectivo") : "";
       base["Proveedor / Cliente / Detalle"] = t.party || "—";
       base["Nota"] = t.note || "";
       return base;
@@ -496,10 +497,10 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
               <thead>
                 <tr className="bg-slate-800/80 border-b border-slate-700">
                   {(canViewFinance
-                    ? ["Fuente","Tipo","Fecha","Producto / SKU","Cant.","Total","Detalle",""]
-                    : ["Fuente","Tipo","Fecha","Producto / SKU","Cant.","Detalle",""]
+                    ? ["Fuente","Tipo","Fecha","Producto / SKU","Cant.","Total","Pago","Detalle",""]
+                    : ["Fuente","Tipo","Fecha","Producto / SKU","Cant.","Pago","Detalle",""]
                   ).map((h,i,arr) => (
-                    <th key={i} className={`py-2.5 px-3 text-slate-400 font-medium uppercase tracking-wider ${i === arr.length-1 ? "w-8" : i > 3 ? "text-right" : "text-left"} ${h==="Detalle" ? "hidden md:table-cell" : ""}`}>{h}</th>
+                    <th key={i} className={`py-2.5 px-3 text-slate-400 font-medium uppercase tracking-wider ${h==="Pago" ? "text-center hidden sm:table-cell" : i === arr.length-1 ? "w-8" : i > 3 ? "text-right" : "text-left"} ${h==="Detalle" ? "hidden md:table-cell" : ""}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -536,6 +537,15 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
                           {t.amount != null ? `${t.type === "compra" ? "-" : "+"} ${formatMoney(t.amount, currencySymbol)}` : "—"}
                         </td>
                       )}
+                      <td className="py-2.5 px-3 text-center hidden sm:table-cell">
+                        {t.raw?.paymentMethod && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${
+                            t.raw.paymentMethod === "transferencia" ? "bg-sky-500/15 text-sky-400 border-sky-500/30" : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                          }`}>
+                            {t.raw.paymentMethod === "transferencia" ? "🏦 Transf." : "💵 Efectivo"}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 hidden md:table-cell text-slate-400">{t.party}</td>
                       <td className="py-2.5 px-3 text-center">
                         {canReprint && (

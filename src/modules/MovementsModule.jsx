@@ -134,6 +134,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
             total: cartTotal,
             currencySymbol,
             invoiceNumber,
+            paymentMethod,
           });
         } catch (invErr) {
           console.error("Error generando comprobante:", invErr);

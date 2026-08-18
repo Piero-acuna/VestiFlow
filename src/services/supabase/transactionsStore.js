@@ -17,7 +17,7 @@ export function subscribeToTransactions(companyId, onData) {
       id: t.id, type: t.type, date: t.date, time: t.time,
       product: t.product, sku: t.sku, description: t.description,
       qty: t.qty, unitPrice: Number(t.unit_price) || 0, total: Number(t.total) || 0,
-      client: t.client, supplier: t.supplier, note: t.note,
+      client: t.client, supplier: t.supplier, paymentMethod: t.payment_method, note: t.note,
       createdBy: t.created_by, createdAt: t.created_at,
     })));
   }

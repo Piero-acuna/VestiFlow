@@ -41,7 +41,12 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
     const q = search.toLowerCase();
     const matchesSearch = !q || g.name?.toLowerCase().includes(q) || g.sku?.toLowerCase().includes(q) || g.brand?.toLowerCase().includes(q);
     const matchesCategory = categoryFilter === "Todas" || g.category === categoryFilter;
-    const matchesStatus = statusFilter === "Todos" || g.status === statusFilter;
+    // "Todos" NO incluye Agotado a propósito: una prenda con 0 stock
+    // vendible (recién creada hacia Almacén, o vendida por completo) no
+    // aparece en el catálogo de venta salvo que se filtre "Agotado" a
+    // mano — evita mostrar precio/ficha de algo que hoy no se puede
+    // vender. En cuanto se envía stock desde Almacén, reaparece solo.
+    const matchesStatus = statusFilter === "Todos" ? g.status !== "Agotado" : g.status === statusFilter;
     return matchesSearch && matchesCategory && matchesStatus;
   }), [garments, search, categoryFilter, statusFilter]);
 
@@ -100,6 +105,11 @@ const InventoryModule = ({ companyId, userName, canCreate, canEdit, canDelete, c
       </div>
 
       {/* Grid */}
+      {statusFilter === "Todos" && stats[3].value > 0 && (
+        <p className="text-xs text-slate-500 -mt-2">
+          {stats[3].value} prenda{stats[3].value === 1 ? "" : "s"} sin stock vendible (agotada, o recién creada hacia Almacén) no se muestra{stats[3].value === 1 ? "" : "n"} acá — usa el filtro <span className="text-slate-400 font-medium">Agotado</span> para verla{stats[3].value === 1 ? "" : "s"}.
+        </p>
+      )}
       {loading ? <Spinner /> : filtered.length === 0 ? (
         <EmptyState icon={<Shirt size={40} />} msg="No se encontraron prendas"
           sub={garments.length === 0 ? "Agrega tu primera prenda para empezar" : "Prueba con otra búsqueda o filtro"} />
