@@ -69,6 +69,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
         product: t.product, sku: t.sku, description: t.description || "", qty: t.qty, unit: t.packName || "",
         amount: t.total ?? null,
         party: t.supplier || t.client || "—",
+        registeredBy: t.createdBy || "—",
         note: t.note || "",
         raw: t,
       });
@@ -84,6 +85,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
           product: s.product, sku: s.sku, description: s.description || "", qty: s.qty, unit: s.packName || "",
           amount: s.total ?? null,
           party: s.supplier || "—",
+          registeredBy: s.userName || "—",
           note: s.status === "Cancelado" ? `Cancelada${s.note ? " · " + s.note : ""}` : (s.note || ""),
           status: s.status,
           raw: s,
@@ -104,6 +106,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
           party: m.type === "traslado" ? `${m.fromLocationName || "?"} → ${m.toLocationName || "?"}`
                : m.type === "envio_inventario" ? `🏪 ${m.storeProductName || "Tienda"}`
                : (m.toLocationName || m.fromLocationName || "—"),
+          registeredBy: m.userName || "—",
           note: m.reason || "",
           raw: m,
         });
@@ -262,6 +265,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
         base[`Total (${currencySymbol})`] = Number(t.amount.toFixed(2));
       }
       base["Pago"] = t.raw?.paymentMethod ? (t.raw.paymentMethod === "transferencia" ? "Transferencia" : "Efectivo") : "";
+      base["Registrado por"] = t.registeredBy && t.registeredBy !== "—" ? t.registeredBy : "";
       base["Proveedor / Cliente / Detalle"] = t.party || "—";
       base["Nota"] = t.note || "";
       return base;
@@ -546,7 +550,12 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 hidden md:table-cell text-slate-400">{t.party}</td>
+                      <td className="py-2.5 px-3 hidden md:table-cell text-slate-400">
+                        {t.party}
+                        {t.registeredBy && t.registeredBy !== "—" && (
+                          <div className="text-[10px] text-slate-600">por {t.registeredBy}</div>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-center">
                         {canReprint && (
                           <button

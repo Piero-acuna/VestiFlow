@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { addLocation, updateLocation, deleteLocation, sendToSalesFloor } from "../../services/supabase/warehouseStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
+import { formatMoney } from "../../utils/currency";
 import { EmptyState } from "../shared/StatusUI";
 import ColorSwatch from "../inventory/ColorSwatch";
 import { getColorConfig } from "../../config/clothingConfig";
@@ -20,7 +21,7 @@ import { getColorConfig } from "../../config/clothingConfig";
 const LOCATION_TYPES = ["Bodega", "Zona", "Estante", "Pasillo", "Refrigerador", "Otro"];
 const EMPTY_LOC = { name: "", type: "Bodega", code: "", description: "" };
 
-export default function LocationsTab({ locations, stock, companyId, userName, canManage }) {
+export default function LocationsTab({ locations, stock, garments = [], currencySymbol, companyId, userName, canManage }) {
   const [showForm, setShowForm] = useState(false);
   const [editLoc,  setEditLoc]  = useState(null);
   const [form,     setForm]     = useState(EMPTY_LOC);
@@ -28,6 +29,8 @@ export default function LocationsTab({ locations, stock, companyId, userName, ca
   const [formError,setFormError]= useState("");
   const [search,   setSearch]   = useState("");
   const [expanded, setExpanded] = useState(null);
+
+  const priceByGarment = useMemo(() => Object.fromEntries(garments.map(g => [g.id, g.price])), [garments]);
 
   const stockByLocation = useMemo(() => {
     const map = {};
@@ -149,7 +152,13 @@ export default function LocationsTab({ locations, stock, companyId, userName, ca
                   <span className="p-2 bg-amber-500/10 text-amber-400 rounded-lg flex-shrink-0"><Boxes size={15} /></span>
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-sm font-semibold text-slate-200 truncate">{loc.name}{loc.code ? <span className="text-slate-500 font-mono text-xs ml-1.5">({loc.code})</span> : ""}</p>
-                    <p className="text-xs text-slate-500">{loc.type} · {items.reduce((s, i) => s + i.qty, 0)} unidades · {items.length} variante{items.length !== 1 ? "s" : ""}</p>
+                    <p className="text-xs text-slate-500">
+                      {loc.type} · {items.reduce((s, i) => s + i.qty, 0)} unidades · {items.length} variante{items.length !== 1 ? "s" : ""}
+                      {(() => {
+                        const value = items.reduce((s, i) => s + (i.qty * (priceByGarment[i.garmentId] || 0)), 0);
+                        return value > 0 ? <span className="text-emerald-500/80"> · {formatMoney(value, currencySymbol)}</span> : null;
+                      })()}
+                    </p>
                   </div>
                   {canManage && (
                     <span className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
@@ -164,7 +173,8 @@ export default function LocationsTab({ locations, stock, companyId, userName, ca
                     {items.length === 0 ? (
                       <p className="text-xs text-slate-600 text-center py-3">Sin stock en esta ubicación.</p>
                     ) : items.map(item => (
-                      <StockRow key={item.id} item={item} companyId={companyId} userName={userName} canManage={canManage} />
+                      <StockRow key={item.id} item={item} companyId={companyId} userName={userName} canManage={canManage}
+                        price={priceByGarment[item.garmentId]} currencySymbol={currencySymbol} />
                     ))}
                   </div>
                 )}
@@ -177,7 +187,7 @@ export default function LocationsTab({ locations, stock, companyId, userName, ca
   );
 }
 
-function StockRow({ item, companyId, userName, canManage }) {
+function StockRow({ item, companyId, userName, canManage, price, currencySymbol }) {
   const [sending, setSending] = useState(false);
   const [qty, setQty] = useState("");
   const [busy, setBusy] = useState(false);
@@ -206,9 +216,15 @@ function StockRow({ item, companyId, userName, canManage }) {
         <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center flex-shrink-0"><Package size={12} className="text-slate-400" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-slate-200 truncate">{item.garmentName}</p>
-          <p className="text-[11px] text-slate-500 flex items-center gap-1.5"><ColorSwatch colorId={item.color} size={8} />{item.talla} · {getColorConfig(item.color).label}</p>
+          <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+            <ColorSwatch colorId={item.color} size={8} />{item.talla} · {getColorConfig(item.color).label}
+            {price != null && <span className="text-emerald-500/80 font-mono">· {formatMoney(price, currencySymbol)} c/u</span>}
+          </p>
         </div>
-        <span className="text-sm font-mono font-bold text-amber-400 flex-shrink-0">{item.qty} und</span>
+        <div className="text-right flex-shrink-0">
+          <span className="text-sm font-mono font-bold text-amber-400 block">{item.qty} und</span>
+          {price != null && <span className="text-[10px] font-mono text-slate-500">{formatMoney(price * item.qty, currencySymbol)}</span>}
+        </div>
         {canManage && (
           <button onClick={() => setSending(s => !s)} title="Enviar a venta"
             className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg flex-shrink-0 transition-colors"><Send size={12} /></button>

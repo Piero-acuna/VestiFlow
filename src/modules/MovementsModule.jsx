@@ -50,7 +50,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
     product: r.garmentName, sku: r.variantSku,
     description: `Talla ${r.talla} · ${r.color}`,
     qty: r.qty, packName: "", total: r.total,
-    supplier: r.supplierName, status: r.status, note: r.note,
+    supplier: r.supplierName, status: r.status, note: r.note, userName: r.userName,
   })), [supplierReturns]);
 
   const sellable = useMemo(() => flattenSellableVariants(garments), [garments]);

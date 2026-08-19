@@ -13,6 +13,7 @@ import { useState } from "react";
 import { MapPin, ArrowLeftRight, History as HistoryIcon } from "lucide-react";
 import { useWarehouseData } from "./hooks/useWarehouseData";
 import { useGarments } from "./hooks/useGarments";
+import { useAuth } from "./contexts/AuthContext";
 import { Spinner } from "./components/shared/StatusUI";
 import LocationsTab from "./components/warehouse/LocationsTab";
 import MovementForm from "./components/warehouse/MovementForm";
@@ -25,6 +26,7 @@ const TABS = [
 ];
 
 export default function WarehouseModule({ companyId, userName, canManage }) {
+  const { companyCurrency } = useAuth();
   const { locations, stock, movements, loading } = useWarehouseData(companyId);
   const [garments, loadingGarments] = useGarments(companyId);
   const [tab, setTab] = useState("locations");
@@ -43,7 +45,8 @@ export default function WarehouseModule({ companyId, userName, canManage }) {
       </div>
 
       {tab === "locations" && (
-        <LocationsTab locations={locations} stock={stock} companyId={companyId} userName={userName} canManage={canManage} />
+        <LocationsTab locations={locations} stock={stock} garments={garments} currencySymbol={companyCurrency.currencySymbol}
+          companyId={companyId} userName={userName} canManage={canManage} />
       )}
       {tab === "movement" && (
         canManage ? (
