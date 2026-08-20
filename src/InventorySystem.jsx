@@ -198,6 +198,9 @@ export default function InventoryApp() {
                 onSaveBilling={handleSaveBilling}
                 companyCurrency={companyCurrency}
                 onChangeCountry={handleChangeCountry}
+                subscriptionStatus={subscription?.status}
+                trialDaysLeft={trialDaysLeft}
+                paidUntil={paidUntil}
               />
             </div>
 

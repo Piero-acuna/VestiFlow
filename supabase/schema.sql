@@ -144,7 +144,7 @@ create table if not exists public.transactions (
   total       numeric(10,2) not null default 0,
   client      text,
   supplier    text,
-  payment_method text check (payment_method in ('efectivo','transferencia')),
+  payment_method text check (payment_method in ('efectivo','transferencia','yape')),
   note        text,
   created_by  text,
   created_at  timestamptz not null default now()
@@ -154,7 +154,7 @@ create table if not exists public.transactions (
 alter table public.transactions add column if not exists payment_method text;
 alter table public.transactions drop constraint if exists transactions_payment_method_check;
 alter table public.transactions add constraint transactions_payment_method_check
-  check (payment_method in ('efectivo','transferencia'));
+  check (payment_method in ('efectivo','transferencia','yape'));
 create index if not exists transactions_company_id_idx on public.transactions(company_id);
 create index if not exists transactions_date_idx on public.transactions(company_id, date);
 
@@ -246,7 +246,7 @@ create table if not exists public.supplier_purchases (
   qty            integer not null,
   unit_cost      numeric(10,2) not null,
   total          numeric(10,2) not null,
-  payment_method text check (payment_method in ('efectivo','transferencia')),
+  payment_method text check (payment_method in ('efectivo','transferencia','yape')),
   note           text,
   user_name      text,
   date           date not null default current_date,
@@ -256,7 +256,7 @@ create table if not exists public.supplier_purchases (
 alter table public.supplier_purchases add column if not exists payment_method text;
 alter table public.supplier_purchases drop constraint if exists supplier_purchases_payment_method_check;
 alter table public.supplier_purchases add constraint supplier_purchases_payment_method_check
-  check (payment_method in ('efectivo','transferencia'));
+  check (payment_method in ('efectivo','transferencia','yape'));
 create index if not exists supplier_purchases_company_id_idx on public.supplier_purchases(company_id);
 create index if not exists supplier_purchases_supplier_id_idx on public.supplier_purchases(supplier_id);
 
@@ -277,7 +277,7 @@ create table if not exists public.purchase_batches (
   remaining_qty  integer not null,        -- baja a medida que se clasifica
   unit_cost      numeric(10,2) not null default 0,
   total_cost     numeric(10,2) not null default 0,
-  payment_method text check (payment_method in ('efectivo','transferencia')),
+  payment_method text check (payment_method in ('efectivo','transferencia','yape')),
   status         text not null default 'pendiente' check (status in ('pendiente','parcial','clasificado')),
   note           text,
   user_name      text,
@@ -286,6 +286,10 @@ create table if not exists public.purchase_batches (
   created_at     timestamptz not null default now()
 );
 create index if not exists purchase_batches_company_id_idx on public.purchase_batches(company_id);
+alter table public.purchase_batches add column if not exists payment_method text;
+alter table public.purchase_batches drop constraint if exists purchase_batches_payment_method_check;
+alter table public.purchase_batches add constraint purchase_batches_payment_method_check
+  check (payment_method in ('efectivo','transferencia','yape'));
 
 -- Devoluciones a proveedor — mercadería que sale de vuelta (defectuosa,
 -- sobrestock de temporada, etc). El stock del almacén recién se descuenta
@@ -696,7 +700,7 @@ begin
   if not has_permission('registrar_ventas') then
     raise exception 'No tienes permiso para registrar ventas.';
   end if;
-  if p_payment_method not in ('efectivo','transferencia') then
+  if p_payment_method not in ('efectivo','transferencia','yape') then
     raise exception 'Método de pago inválido.';
   end if;
 
@@ -892,7 +896,7 @@ begin
   if not has_permission('gestionar_proveedores') then
     raise exception 'No tienes permiso para registrar compras a proveedor.';
   end if;
-  if p_payment_method not in ('efectivo','transferencia') then
+  if p_payment_method not in ('efectivo','transferencia','yape') then
     raise exception 'Método de pago inválido.';
   end if;
 
@@ -943,7 +947,7 @@ begin
   if not has_permission('gestionar_proveedores') then
     raise exception 'No tienes permiso para registrar compras a proveedor.';
   end if;
-  if p_payment_method not in ('efectivo','transferencia') then
+  if p_payment_method not in ('efectivo','transferencia','yape') then
     raise exception 'Método de pago inválido.';
   end if;
   if p_qty <= 0 then

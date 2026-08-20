@@ -150,6 +150,7 @@ export default function RolePanel({
   onRegisterEmployee, onChangePermissions, onToggleActive,
   billing, onSaveBilling,
   companyCurrency, onChangeCountry,
+  subscriptionStatus, trialDaysLeft, paidUntil,
 }) {
   const [open,     setOpen]     = useState(false);
   const [tab,      setTab]      = useState("perfil"); // "perfil" | "equipo"
@@ -204,7 +205,8 @@ export default function RolePanel({
           </div>
 
           <div className="p-4 max-h-[min(32rem,70vh)] overflow-y-auto">
-            {tab === "perfil" && <PerfilTab userProfile={userProfile} companyName={companyName} companyCurrency={companyCurrency} onChangeCountry={onChangeCountry} />}
+            {tab === "perfil" && <PerfilTab userProfile={userProfile} companyName={companyName} companyCurrency={companyCurrency} onChangeCountry={onChangeCountry}
+              subscriptionStatus={subscriptionStatus} trialDaysLeft={trialDaysLeft} paidUntil={paidUntil} />}
             {tab === "equipo" && canManage && (
               <EquipoTab
                 employees={employees}
@@ -228,11 +230,14 @@ export default function RolePanel({
 }
 
 // ── Pestaña: Mis Datos ────────────────────────────────────────────────────────
-function PerfilTab({ userProfile, companyName, companyCurrency, onChangeCountry }) {
+function PerfilTab({ userProfile, companyName, companyCurrency, onChangeCountry, subscriptionStatus, trialDaysLeft, paidUntil }) {
   if (!userProfile) return null;
   const isOwner = userProfile.role === "owner";
   const perms = getEffectivePermissions(userProfile);
   const activeKeys = Object.entries(perms).filter(([, v]) => v).map(([k]) => k);
+  const gatewayLabel = companyCurrency?.paymentGateway === "culqi" ? "Culqi" : "Mercado Pago";
+  const paidUntilLabel = paidUntil ? new Date(paidUntil).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" }) : null;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
@@ -248,6 +253,16 @@ function PerfilTab({ userProfile, companyName, companyCurrency, onChangeCountry 
       <Row label="Rol" value={isOwner ? "Dueño" : "Empleado"} />
       <Row label="Empresa" value={companyName} />
       <Row label="Estado" value={userProfile.active === false ? "Desactivado" : "Activo"} />
+      <Row label="Pasarela de pago" value={gatewayLabel} />
+
+      {subscriptionStatus === "trial" && (
+        <Row label="Prueba gratis"
+          value={trialDaysLeft != null ? `${trialDaysLeft} día${trialDaysLeft === 1 ? "" : "s"} restante${trialDaysLeft === 1 ? "" : "s"}` : "Vencida"}
+          valueClass={trialDaysLeft != null && trialDaysLeft <= 3 ? "text-amber-400 font-semibold" : undefined} />
+      )}
+      {subscriptionStatus === "active" && paidUntilLabel && (
+        <Row label="Plan activo" value={`Hasta el ${paidUntilLabel}`} />
+      )}
 
       {isOwner && (
         <CurrencySection companyCurrency={companyCurrency} onChangeCountry={onChangeCountry} />
@@ -363,10 +378,10 @@ function labelFor(key) {
   return key;
 }
 
-const Row = ({ label, value }) => (
+const Row = ({ label, value, valueClass }) => (
   <div className="flex items-center justify-between text-xs">
     <span className="text-slate-500 uppercase tracking-wider">{label}</span>
-    <span className="text-slate-200 font-medium">{value}</span>
+    <span className={valueClass || "text-slate-200 font-medium"}>{value}</span>
   </div>
 );
 

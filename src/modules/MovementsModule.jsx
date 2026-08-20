@@ -278,7 +278,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
               <div className="mb-4">
                 <label className="text-xs text-slate-400 uppercase tracking-wider mb-1.5 block">Método de pago</label>
                 <div className="flex gap-2">
-                  {[{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }].map(m => (
+                  {[{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }, { id: "yape", label: "📲 Yape" }].map(m => (
                     <button key={m.id} type="button" onClick={() => setPaymentMethod(m.id)}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
                         paymentMethod === m.id ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-600 text-slate-400 hover:border-slate-500"

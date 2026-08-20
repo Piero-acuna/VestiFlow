@@ -20,6 +20,7 @@ import { Spinner } from "./shared/StatusUI";
 import { useAuth } from "../contexts/AuthContext";
 import { formatMoney } from "../utils/currency";
 import { calcGrossProfit, calcGlobalMarginPercent } from "../utils/finance";
+import { getPaymentMethodDisplay } from "../utils/paymentMethod";
 
 // ─── HISTORY TABLE ────────────────────────────────────────────────────────────
 const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements = [], supplierSales = [], loading, canViewFinance, canPurchase, canSell, billing, companyId }) => {
@@ -264,7 +265,7 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
       if (canViewFinance && t.amount != null) {
         base[`Total (${currencySymbol})`] = Number(t.amount.toFixed(2));
       }
-      base["Pago"] = t.raw?.paymentMethod ? (t.raw.paymentMethod === "transferencia" ? "Transferencia" : "Efectivo") : "";
+      base["Pago"] = getPaymentMethodDisplay(t.raw?.paymentMethod)?.label || "";
       base["Registrado por"] = t.registeredBy && t.registeredBy !== "—" ? t.registeredBy : "";
       base["Proveedor / Cliente / Detalle"] = t.party || "—";
       base["Nota"] = t.note || "";
@@ -542,13 +543,14 @@ const TransactionHistory = ({ transactions: rawTransactions, warehouseMovements 
                         </td>
                       )}
                       <td className="py-2.5 px-3 text-center hidden sm:table-cell">
-                        {t.raw?.paymentMethod && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${
-                            t.raw.paymentMethod === "transferencia" ? "bg-sky-500/15 text-sky-400 border-sky-500/30" : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                          }`}>
-                            {t.raw.paymentMethod === "transferencia" ? "🏦 Transf." : "💵 Efectivo"}
-                          </span>
-                        )}
+                        {(() => {
+                          const pm = getPaymentMethodDisplay(t.raw?.paymentMethod);
+                          return pm && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${pm.badgeClass}`}>
+                              {pm.short}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-2.5 px-3 hidden md:table-cell text-slate-400">
                         {t.party}

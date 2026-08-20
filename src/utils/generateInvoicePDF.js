@@ -16,6 +16,7 @@
 //   npm install jspdf
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
+import { getPaymentMethodDisplay } from "./paymentMethod";
 
 // ── Paleta (coherente con la UI: acentos emerald sobre base slate) ──
 const COLOR = {
@@ -211,7 +212,7 @@ export function generateInvoicePDF({
     setText(pdf, COLOR.ink);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9.5);
-    pdf.text(paymentMethod === "transferencia" ? "Transferencia" : "Efectivo", marginX, y + 10.5);
+    pdf.text(getPaymentMethodDisplay(paymentMethod)?.label || "Efectivo", marginX, y + 10.5);
   }
   setFill(pdf, COLOR.ink);
   pdf.roundedRect(totalBoxX, y, totalBoxW, totalBoxH, 1.5, 1.5, "F");

@@ -18,7 +18,7 @@ import VariantPicker from "../warehouse/VariantPicker";
 import { formatMoney } from "../../utils/currency";
 import { flattenAllVariants } from "../../utils/variants";
 
-const PAYMENT_METHODS = [{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }];
+const PAYMENT_METHODS = [{ id: "efectivo", label: "💵 Efectivo" }, { id: "transferencia", label: "🏦 Transferencia" }, { id: "yape", label: "📲 Yape" }];
 
 export default function SupplierPurchaseTab({
   suppliers, garments, locations, companyId, userName,
