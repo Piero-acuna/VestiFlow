@@ -260,6 +260,33 @@ alter table public.supplier_purchases add constraint supplier_purchases_payment_
 create index if not exists supplier_purchases_company_id_idx on public.supplier_purchases(company_id);
 create index if not exists supplier_purchases_supplier_id_idx on public.supplier_purchases(supplier_id);
 
+-- Lotes de compra SIN CLASIFICAR — para cuando llega mercadería surtida a
+-- granel y todavía no sabes el detalle exacto (qué prenda, qué talla, qué
+-- color trae cada caja) hasta que la desempacas. Se registra la compra
+-- completa (cantidad total + costo) de una, y después se va "clasificando"
+-- de a poco con classify_batch_units() — cada clasificación resta de
+-- remaining_qty y suma stock real a una variante concreta del catálogo
+-- (existente o recién creada en Inventario).
+create table if not exists public.purchase_batches (
+  id             uuid primary key default gen_random_uuid(),
+  company_id     uuid not null references public.companies(id) on delete cascade,
+  supplier_id    uuid references public.suppliers(id) on delete set null,
+  supplier_name  text not null,
+  description    text not null,          -- lo que diga el proveedor: "Fardo polos surtido", etc.
+  total_qty      integer not null check (total_qty > 0),
+  remaining_qty  integer not null,        -- baja a medida que se clasifica
+  unit_cost      numeric(10,2) not null default 0,
+  total_cost     numeric(10,2) not null default 0,
+  payment_method text check (payment_method in ('efectivo','transferencia')),
+  status         text not null default 'pendiente' check (status in ('pendiente','parcial','clasificado')),
+  note           text,
+  user_name      text,
+  date           date not null default current_date,
+  time           text,
+  created_at     timestamptz not null default now()
+);
+create index if not exists purchase_batches_company_id_idx on public.purchase_batches(company_id);
+
 -- Devoluciones a proveedor — mercadería que sale de vuelta (defectuosa,
 -- sobrestock de temporada, etc). El stock del almacén recién se descuenta
 -- cuando se CONFIRMA la devolución (el proveedor ya se la llevó), no al
@@ -498,6 +525,13 @@ create policy supplier_purchases_select on public.supplier_purchases for select
 
 drop policy if exists supplier_returns_select on public.supplier_returns;
 create policy supplier_returns_select on public.supplier_returns for select
+  using (company_id = auth_company_id() and has_permission('ver_proveedores'));
+
+-- purchase_batches — mismo criterio; el estado (remaining_qty, status) solo
+-- cambia vía classify_batch_units(), nunca por UPDATE directo del cliente.
+alter table public.purchase_batches enable row level security;
+drop policy if exists purchase_batches_select on public.purchase_batches;
+create policy purchase_batches_select on public.purchase_batches for select
   using (company_id = auth_company_id() and has_permission('ver_proveedores'));
 
 -- ───────────────────────────────────────────────────────────────────────────
@@ -892,6 +926,121 @@ begin
 end;
 $$;
 
+-- Compra de un LOTE SURTIDO sin clasificar todavía — se registra la compra
+-- completa (queda en Historial de inmediato, el dinero ya salió) pero SIN
+-- tocar ninguna variante puntual, porque todavía no se sabe el detalle.
+create or replace function public.record_purchase_batch(
+  p_supplier_id uuid, p_supplier_name text, p_description text,
+  p_qty integer, p_unit_cost numeric, p_payment_method text, p_note text, p_user_name text
+) returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_company_id uuid := auth_company_id();
+  v_batch_id uuid;
+  v_total numeric := p_qty * p_unit_cost;
+  v_today date := current_date;
+  v_time text := to_char(now(), 'HH24:MI');
+begin
+  if not has_permission('gestionar_proveedores') then
+    raise exception 'No tienes permiso para registrar compras a proveedor.';
+  end if;
+  if p_payment_method not in ('efectivo','transferencia') then
+    raise exception 'Método de pago inválido.';
+  end if;
+  if p_qty <= 0 then
+    raise exception 'La cantidad debe ser mayor a cero.';
+  end if;
+
+  insert into public.purchase_batches (
+    company_id, supplier_id, supplier_name, description, total_qty, remaining_qty,
+    unit_cost, total_cost, payment_method, status, note, user_name, date, time
+  ) values (
+    v_company_id, p_supplier_id, p_supplier_name, p_description, p_qty, p_qty,
+    p_unit_cost, v_total, p_payment_method, 'pendiente', p_note, p_user_name, v_today, v_time
+  )
+  returning id into v_batch_id;
+
+  insert into public.transactions (company_id, type, date, time, product, description, qty, unit_price, total, supplier, payment_method, note, created_by)
+  values (
+    v_company_id, 'compra', v_today, v_time, p_description,
+    'Lote surtido sin clasificar · ' || p_qty || ' und',
+    p_qty, p_unit_cost, v_total, p_supplier_name, p_payment_method, p_note, p_user_name
+  );
+
+  return v_batch_id;
+end;
+$$;
+
+-- Clasifica N unidades de un lote surtido hacia una variante CONCRETA del
+-- catálogo (ya tiene que existir — si la prenda/talla/color todavía no
+-- están creados, se crean primero en Inventario y se vuelve acá). Resta de
+-- remaining_qty y suma stock real, a Almacén (con ubicación) o directo al
+-- piso de venta, igual que las otras funciones de entrada de stock.
+create or replace function public.classify_batch_units(
+  p_batch_id uuid, p_variant_sku text, p_garment_id uuid, p_garment_name text,
+  p_talla text, p_color text, p_qty integer,
+  p_destination text, -- 'almacen' | 'venta'
+  p_location_id uuid, p_location_name text, p_user_name text
+) returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_company_id uuid := auth_company_id();
+  v_batch public.purchase_batches%rowtype;
+  v_new_remaining integer;
+  v_new_status text;
+begin
+  if not has_permission('gestionar_proveedores') then
+    raise exception 'No tienes permiso para clasificar compras.';
+  end if;
+  if p_destination not in ('almacen','venta') then
+    raise exception 'Destino inválido.';
+  end if;
+
+  select * into v_batch from public.purchase_batches
+    where id = p_batch_id and company_id = v_company_id for update;
+  if not found then raise exception 'Lote no encontrado.'; end if;
+  if p_qty <= 0 or p_qty > v_batch.remaining_qty then
+    raise exception 'Cantidad inválida: quedan % unidades sin clasificar en este lote.', v_batch.remaining_qty;
+  end if;
+
+  if p_destination = 'almacen' then
+    if p_location_id is null then raise exception 'Elige la ubicación de almacén.'; end if;
+
+    insert into public.warehouse_stock (company_id, variant_sku, garment_id, garment_name, talla, color, location_id, qty)
+    values (v_company_id, p_variant_sku, p_garment_id, p_garment_name, p_talla, p_color, p_location_id, p_qty)
+    on conflict (variant_sku, location_id) do update
+      set qty = public.warehouse_stock.qty + excluded.qty, updated_at = now();
+
+    insert into public.warehouse_movements (
+      company_id, type, variant_sku, garment_id, garment_name, talla, color, qty,
+      to_location_id, to_location_name, reason, user_name, time
+    ) values (
+      v_company_id, 'entrada', p_variant_sku, p_garment_id, p_garment_name, p_talla, p_color, p_qty,
+      p_location_id, p_location_name, 'Clasificado de lote: ' || v_batch.description, p_user_name, to_char(now(), 'HH24:MI')
+    );
+  else
+    update public.garment_variants set stock = stock + p_qty
+      where sku = p_variant_sku and company_id = v_company_id;
+
+    insert into public.garment_history (company_id, garment_id, variant_sku, action, type, qty, detail, user_name)
+    values (
+      v_company_id, p_garment_id, p_variant_sku, 'Clasificado de lote', 'add', p_qty,
+      'Talla ' || p_talla || ' · ' || p_color || ' · Lote: ' || v_batch.description, p_user_name
+    );
+
+    perform public.recompute_garment_status(p_garment_id);
+  end if;
+
+  v_new_remaining := v_batch.remaining_qty - p_qty;
+  v_new_status := case
+    when v_new_remaining = 0 then 'clasificado'
+    when v_new_remaining < v_batch.total_qty then 'parcial'
+    else 'pendiente'
+  end;
+
+  update public.purchase_batches set remaining_qty = v_new_remaining, status = v_new_status
+    where id = p_batch_id;
+end;
+$$;
+
 -- Devolución a proveedor — se crea en 'Pendiente' SIN tocar stock todavía
 -- (la mercadería sigue físicamente en tu almacén hasta que el proveedor la
 -- recoja). confirm_supplier_return() recién ahí descuenta stock de verdad.
@@ -1050,6 +1199,7 @@ create publication supabase_realtime for table
   public.warehouse_movements,
   public.suppliers,
   public.supplier_purchases,
-  public.supplier_returns;
+  public.supplier_returns,
+  public.purchase_batches;
 
 

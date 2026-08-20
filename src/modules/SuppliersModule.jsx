@@ -12,6 +12,7 @@ import {
   subscribeToSuppliers, addSupplier, updateSupplier, deleteSupplier,
   subscribeToSupplierPurchases, recordSupplierPurchase,
   subscribeToSupplierReturns, recordSupplierReturn, confirmSupplierReturn, cancelSupplierReturn,
+  subscribeToPurchaseBatches, recordPurchaseBatch,
 } from "../services/supabase/suppliersStore";
 import { getNextInvoiceNumber } from "../services/supabase/companyStore";
 import { generateInvoicePDF } from "../utils/generateInvoicePDF";
@@ -28,6 +29,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const EMPTY_SUPPLIER = { name: "", ruc: "", category: "Telas", contact: "", phone: "", address: "", status: "Activo" };
 const EMPTY_PURCHASE = { supplierId: "", variant: null, locationId: "", qty: "", unitCost: "", paymentMethod: "efectivo", note: "" };
+const EMPTY_BATCH = { supplierId: "", description: "", qty: "", unitCost: "", paymentMethod: "efectivo", note: "" };
 const EMPTY_RETURN   = { supplierId: "", variant: null, locationId: "", qty: "", unitPrice: "", note: "" };
 
 const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, canViewFinance, billing }) => {
@@ -39,6 +41,7 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
   const [suppliers, loadingSup] = useSupabaseList(subscribeToSuppliers, companyId);
   const [purchases] = useSupabaseList(subscribeToSupplierPurchases, companyId);
   const [returns]   = useSupabaseList(subscribeToSupplierReturns, companyId);
+  const [batches]   = useSupabaseList(subscribeToPurchaseBatches, companyId);
 
   const [tab, setTab] = useState("list");
   const [showForm, setShowForm] = useState(false);
@@ -53,6 +56,11 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
   const [pSuccess, setPSuccess] = useState(false);
   const [pError, setPError] = useState("");
   const [pMsg, setPMsg] = useState("");
+
+  const [bForm, setBForm] = useState(EMPTY_BATCH);
+  const [bSaving, setBSaving] = useState(false);
+  const [bSuccess, setBSuccess] = useState(false);
+  const [bError, setBError] = useState("");
 
   const [rForm, setRForm] = useState(EMPTY_RETURN);
   const [rSaving, setRSaving] = useState(false);
@@ -119,6 +127,26 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
       setPError(logAndGetErrorMessage(err, "Error al registrar compra:"));
     }
     setPSaving(false);
+  }
+
+  async function handleBatchSubmit() {
+    setBError("");
+    const { supplierId, description, qty, unitCost, paymentMethod, note } = bForm;
+    if (!supplierId || !description || !qty || !unitCost) { setBError("Completa todos los campos obligatorios."); return; }
+    setBSaving(true);
+    try {
+      const supplier = suppliers.find(s => s.id === supplierId);
+      await recordPurchaseBatch(companyId, {
+        supplierId, supplierName: supplier?.name || "",
+        description, qty: Number(qty), unitCost: Number(unitCost),
+        paymentMethod, note, userName,
+      });
+      setBSuccess(true);
+      setTimeout(() => { setBSuccess(false); setBForm(EMPTY_BATCH); }, 3000);
+    } catch (err) {
+      setBError(logAndGetErrorMessage(err, "Error al registrar lote:"));
+    }
+    setBSaving(false);
   }
 
   async function handleReturnSubmit() {
@@ -189,9 +217,11 @@ const SuppliersModule = ({ companyId, userName, canManageSuppliers, canDelete, c
           onSelect={setSelSupplier} onToggleStatus={handleToggleStatus} onEdit={openEdit} onDelete={handleDeleteSupplier} />
       )}
       {tab === "purchase" && (
-        <SupplierPurchaseTab suppliers={suppliers} garments={garments} locations={locations}
+        <SupplierPurchaseTab suppliers={suppliers} garments={garments} locations={locations} companyId={companyId} userName={userName}
           form={pForm} setForm={setPForm} saving={pSaving} success={pSuccess} error={pError} msg={pMsg}
-          onSubmit={handlePurchaseSubmit} currencySymbol={currencySymbol} purchases={purchases} />
+          onSubmit={handlePurchaseSubmit} currencySymbol={currencySymbol} purchases={purchases}
+          batchForm={bForm} setBatchForm={setBForm} batchSaving={bSaving} batchSuccess={bSuccess} batchError={bError}
+          onSubmitBatch={handleBatchSubmit} batches={batches} />
       )}
       {tab === "return" && (
         <SupplierReturnTab suppliers={suppliers} garments={garments} locations={locations}

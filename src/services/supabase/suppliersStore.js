@@ -125,3 +125,49 @@ function mapPurchaseOrReturn(row) {
     userName: row.user_name, date: row.date, time: row.time, createdAt: row.created_at,
   };
 }
+
+// ── Lotes de compra sin clasificar ───────────────────────────────────────────
+export function subscribeToPurchaseBatches(companyId, onData) {
+  if (!companyId) return () => {};
+
+  async function fetchAndNotify() {
+    const { data, error } = await supabase
+      .from("purchase_batches").select("*")
+      .eq("company_id", companyId).order("created_at", { ascending: false });
+    if (error) { console.error("Error cargando lotes de compra:", error); return; }
+    onData(data.map(b => ({
+      id: b.id, supplierId: b.supplier_id, supplierName: b.supplier_name, description: b.description,
+      totalQty: b.total_qty, remainingQty: b.remaining_qty,
+      unitCost: Number(b.unit_cost) || 0, totalCost: Number(b.total_cost) || 0,
+      paymentMethod: b.payment_method, status: b.status, note: b.note,
+      userName: b.user_name, date: b.date, time: b.time, createdAt: b.created_at,
+    })));
+  }
+
+  fetchAndNotify();
+  const channel = uniqueChannel(`purchase_batches-${companyId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "purchase_batches", filter: `company_id=eq.${companyId}` }, fetchAndNotify)
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+export async function recordPurchaseBatch(companyId, payload) {
+  const { error } = await supabase.rpc("record_purchase_batch", {
+    p_supplier_id: payload.supplierId || null, p_supplier_name: payload.supplierName,
+    p_description: payload.description, p_qty: payload.qty, p_unit_cost: payload.unitCost,
+    p_payment_method: payload.paymentMethod || "efectivo", p_note: payload.note || null, p_user_name: payload.userName,
+  });
+  if (error) throw error;
+}
+
+/** destination: 'almacen' | 'venta' */
+export async function classifyBatchUnits(companyId, payload) {
+  const { error } = await supabase.rpc("classify_batch_units", {
+    p_batch_id: payload.batchId, p_variant_sku: payload.variantSku, p_garment_id: payload.garmentId,
+    p_garment_name: payload.garmentName, p_talla: payload.talla, p_color: payload.color, p_qty: payload.qty,
+    p_destination: payload.destination,
+    p_location_id: payload.locationId || null, p_location_name: payload.locationName || null,
+    p_user_name: payload.userName,
+  });
+  if (error) throw error;
+}
