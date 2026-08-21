@@ -31,7 +31,7 @@ function mapGarment(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     variants: (row.garment_variants || []).map(v => ({
-      talla: v.talla, color: v.color, sku: v.sku, stock: v.stock, minStock: v.min_stock,
+      talla: v.talla, color: v.color, sku: v.sku, barcode: v.barcode, stock: v.stock, minStock: v.min_stock,
     })),
   };
 }
@@ -75,7 +75,7 @@ export async function addGarment(companyId, data) {
     const { error: vErr } = await supabase.from("garment_variants").insert(
       variants.map(v => ({
         company_id: companyId, garment_id: inserted.id,
-        talla: v.talla, color: v.color, sku: v.sku, stock: v.stock, min_stock: v.minStock,
+        talla: v.talla, color: v.color, sku: v.sku, barcode: v.barcode ?? null, stock: v.stock, min_stock: v.minStock,
       }))
     );
     if (vErr) throw vErr;
@@ -115,7 +115,7 @@ export async function updateGarment(companyId, garmentId, data) {
     const { error: upErr } = await supabase.from("garment_variants").upsert(
       variants.map(v => ({
         company_id: companyId, garment_id: garmentId,
-        talla: v.talla, color: v.color, sku: v.sku, stock: v.stock, min_stock: v.minStock,
+        talla: v.talla, color: v.color, sku: v.sku, barcode: v.barcode ?? null, stock: v.stock, min_stock: v.minStock,
       })),
       { onConflict: "company_id,sku" }
     );
@@ -134,6 +134,12 @@ export async function adjustVariantStock(companyId, garmentId, variantSku, { typ
     p_variant_sku: variantSku, p_type: type, p_qty: qty, p_user_name: user,
     p_action: action || null, p_note: note || null,
   });
+  if (error) throw error;
+}
+
+/** Escanea el código real del producto, o guarda uno generado — separado del SKU interno. */
+export async function setVariantBarcode(companyId, variantSku, barcode) {
+  const { error } = await supabase.rpc("set_variant_barcode", { p_variant_sku: variantSku, p_barcode: barcode });
   if (error) throw error;
 }
 

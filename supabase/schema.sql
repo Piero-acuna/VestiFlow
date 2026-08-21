@@ -103,6 +103,7 @@ create table if not exists public.garment_variants (
   talla      text not null,
   color      text not null,
   sku        text not null,
+  barcode    text,          -- el código de barras REAL del producto (escaneado o generado) — distinto del SKU interno
   stock      integer not null default 0 check (stock >= 0),
   min_stock  integer not null default 2,
   created_at timestamptz not null default now(),
@@ -110,6 +111,12 @@ create table if not exists public.garment_variants (
 );
 create index if not exists garment_variants_garment_id_idx on public.garment_variants(garment_id);
 create index if not exists garment_variants_company_id_idx on public.garment_variants(company_id);
+alter table public.garment_variants add column if not exists barcode text;
+-- Un mismo código de barras no puede pertenecer a dos variantes de la misma
+-- empresa (sí puede repetirse entre empresas distintas). Parcial porque
+-- muchas variantes van a tener barcode = NULL hasta que se escaneen/generen.
+drop index if exists garment_variants_barcode_unique;
+create unique index garment_variants_barcode_unique on public.garment_variants (company_id, barcode) where barcode is not null;
 
 -- Historial de una prenda (altas, ajustes, ventas, recibos de almacén).
 -- Tabla propia — ya NO embebida en la prenda como en la versión mock, así
@@ -634,6 +641,35 @@ begin
 
   update public.garments set status = coalesce(v_status, 'Agotado'), updated_at = now()
   where id = p_garment_id;
+end;
+$$;
+
+-- Asigna (o borra, si p_barcode viene vacío) el código de barras REAL de
+-- una variante — separado del SKU interno. Puede venir de escanear el que
+-- ya trae el producto, o de un código generado por la app (ver
+-- generateBarcode() en src/lib/barcode.js, ambos casos llegan igual acá).
+create or replace function public.set_variant_barcode(p_variant_sku text, p_barcode text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_company_id uuid := auth_company_id();
+  v_rows integer;
+begin
+  if not has_permission('editar_productos') then
+    raise exception 'No tienes permiso para editar el código de barras.';
+  end if;
+
+  begin
+    update public.garment_variants
+      set barcode = nullif(trim(p_barcode), '')
+      where sku = p_variant_sku and company_id = v_company_id;
+    get diagnostics v_rows = row_count;
+  exception when unique_violation then
+    raise exception 'Ese código de barras ya está asignado a otra prenda.';
+  end;
+
+  if v_rows = 0 then
+    raise exception 'Variante no encontrada.';
+  end if;
 end;
 $$;
 

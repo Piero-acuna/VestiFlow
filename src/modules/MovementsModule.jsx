@@ -79,7 +79,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
   const recentItems = useMemo(() => sellable.slice(0, 6), [sellable]);
   const q = sSearch.toLowerCase();
   const sFiltered = sSearch ? sellable.filter(i =>
-    i.name?.toLowerCase().includes(q) || i.sku?.toLowerCase().includes(q) ||
+    i.name?.toLowerCase().includes(q) || i.sku?.toLowerCase().includes(q) || i.barcode?.toLowerCase().includes(q) ||
     i.talla?.toLowerCase().includes(q) || getColorConfig(i.color).label.toLowerCase().includes(q)
   ) : [];
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -96,7 +96,7 @@ const MovementsModule = ({ companyId, userName, canPurchase, canSell, canViewFin
 
   const handleBarcodeScan = useCallback((code) => {
     setShowScanner(false);
-    const found = sellable.find(i => i.sku === code);
+    const found = sellable.find(i => i.barcode === code || i.sku === code);
     if (found) {
       addToCart(found);
       setScanFeedback(`✅ "${found.name}" (talla ${found.talla}) agregado al carrito`);

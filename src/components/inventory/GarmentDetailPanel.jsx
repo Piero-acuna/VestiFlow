@@ -6,12 +6,13 @@
 import { useState, useEffect } from "react";
 import {
   X, Edit3, Trash2, ArrowUpCircle, ArrowDownCircle, Loader2,
-  AlertTriangle, History, Package,
+  AlertTriangle, History, Package, ScanBarcode, RefreshCw,
 } from "lucide-react";
-import { adjustVariantStock, deleteGarment, subscribeToGarmentHistory } from "../../services/supabase/garmentsStore";
+import { adjustVariantStock, deleteGarment, subscribeToGarmentHistory, setVariantBarcode } from "../../services/supabase/garmentsStore";
 import { logAndGetErrorMessage } from "../../utils/errors";
 import { StatusBadge } from "../shared/StatusUI";
-import { BarcodeDisplay } from "../BarcodeUI";
+import { BarcodeDisplay, BarcodeScanner } from "../BarcodeUI";
+import { generateBarcode } from "../../lib/barcode";
 import ColorSwatch from "./ColorSwatch";
 import { formatMoney } from "../../utils/currency";
 import { getCategoryConfig, getColorConfig } from "../../config/clothingConfig";
@@ -169,7 +170,7 @@ export default function GarmentDetailPanel({ garment, companyId, userName, curre
                         </div>
                         {adjustError && <p className="text-[11px] text-red-400 mt-1.5">{adjustError}</p>}
                         <div className="mt-2 pt-2 border-t border-slate-800">
-                          <BarcodeDisplay value={v.sku} height={40} />
+                          <VariantBarcodeSection variant={v} companyId={companyId} canEdit={canEdit} />
                         </div>
                       </div>
                     )}
@@ -216,6 +217,59 @@ export default function GarmentDetailPanel({ garment, companyId, userName, curre
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Código de barras de una variante — distinto del SKU interno. Si todavía no
+ * se escaneó/generó ninguno, se sigue usando el SKU como código escaneable
+ * (mismo comportamiento de siempre, para no dejar nada sin código), pero acá
+ * se puede reemplazar por el código REAL del producto.
+ */
+function VariantBarcodeSection({ variant, companyId, canEdit }) {
+  const [scanning, setScanning] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const effectiveCode = variant.barcode || variant.sku;
+
+  async function save(code) {
+    setSaving(true); setError("");
+    try {
+      await setVariantBarcode(companyId, variant.sku, code);
+    } catch (err) {
+      setError(logAndGetErrorMessage(err, "Error al guardar código de barras:"));
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+          {variant.barcode ? "Código de barras" : "Usando el SKU como código (sin escanear todavía)"}
+        </p>
+        {canEdit && (
+          <div className="flex gap-1">
+            <button onClick={() => setScanning(true)} disabled={saving} title="Escanear el código que ya trae el producto"
+              className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-[10px] font-medium text-slate-300 transition-colors disabled:opacity-50">
+              <ScanBarcode size={11} /> Escanear
+            </button>
+            <button onClick={() => save(generateBarcode())} disabled={saving} title="Generar un código propio"
+              className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-[10px] font-medium text-slate-300 transition-colors disabled:opacity-50">
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Generar
+            </button>
+          </div>
+        )}
+      </div>
+      {error && <p className="text-[11px] text-red-400">{error}</p>}
+      <BarcodeDisplay value={effectiveCode} height={40} />
+      {scanning && (
+        <BarcodeScanner
+          onDetected={(code) => { setScanning(false); save(code); }}
+          onClose={() => setScanning(false)}
+        />
+      )}
     </div>
   );
 }
